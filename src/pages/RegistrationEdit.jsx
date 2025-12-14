@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import api from "../api/axios";
 import { toast } from "react-toastify";
-import { AlertCircle, XCircle } from "lucide-react"; // Pastikan install lucide-react
+import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 
-// Komponen Helper Input (Tidak berubah)
+// Komponen Helper Input (sama seperti di RegistrationForm)
 const Input = ({ label, type = "text", ...props }) => (
   <div className="flex flex-col">
     <label className="text-sm font-medium text-gray-700 mb-1">{label}</label>
@@ -15,9 +16,12 @@ const Input = ({ label, type = "text", ...props }) => (
   </div>
 );
 
-export default function RegistrationForm({ onSuccess }) {
+export default function RegistrationEdit() {
+  const { id } = useParams();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [serverError, setServerError] = useState(null); // State untuk simpan pesan error
+  const [saving, setSaving] = useState(false);
+  const [serverError, setServerError] = useState(null);
 
   const [form, setForm] = useState({
     nama_pasien: "",
@@ -31,106 +35,157 @@ export default function RegistrationForm({ onSuccess }) {
     no_sampel_asal: "",
     coding: "",
     jenis_pemeriksaan: "",
-    tgl_terima: new Date().toISOString().split("T")[0],
+    tgl_terima: "",
     tgl_pengambilan: "",
     ket_pengerjaan: "",
     ket_pengiriman: "",
     form_pe: "",
+    no_reg: "",
+    no_sampel_lab: "",
   });
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-    // Hapus pesan error jika user mulai mengetik lagi
-    if (serverError) setServerError(null);
-  };
+  useEffect(() => {
+    fetchRegistration();
+  }, [id]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const fetchRegistration = async () => {
     setLoading(true);
-    setServerError(null);
-
-    // 1. SANITASI DATA SEBELUM KIRIM
-    // Kita buat copy data form, lalu ubah string kosong "" menjadi null
-    // Ini PENTING agar database tidak error saat menerima "" di kolom INT/DATE
-    const payload = {};
-    Object.keys(form).forEach((key) => {
-      const value = form[key];
-      if (value === "") {
-        payload[key] = null;
-      } else {
-        payload[key] = value;
-      }
-    });
-
     try {
-      // Kirim data yang sudah dibersihkan (payload)
-      await api.post("/registrations", payload);
+      const res = await api.get(`/registrations/${id}`);
+      const data = res.data.data;
 
-      toast.success("Data pasien berhasil disimpan!");
+      // Format tanggal untuk input type="date"
+      const formatDateForInput = (dateString) => {
+        if (!dateString) return "";
+        const date = new Date(dateString);
+        return date.toISOString().split("T")[0];
+      };
 
-      // Reset form
       setForm({
-        nama_pasien: "",
-        nik: "",
-        tgl_lahir: "",
-        umur: "",
-        jenis_kelamin: "L",
-        alamat: "",
-        no_kontak: "",
-        asal_sampel: "mandiri",
-        no_sampel_asal: "",
-        coding: "",
-        jenis_pemeriksaan: "",
-        tgl_terima: new Date().toISOString().split("T")[0],
-        tgl_pengambilan: "",
-        ket_pengerjaan: "",
-        ket_pengiriman: "",
-        form_pe: "",
+        nama_pasien: data.nama_pasien || "",
+        nik: data.nik || "",
+        tgl_lahir: formatDateForInput(data.tgl_lahir),
+        umur: data.umur || "",
+        jenis_kelamin: data.jenis_kelamin || "L",
+        alamat: data.alamat || "",
+        no_kontak: data.no_kontak || "",
+        asal_sampel: data.asal_sampel || "mandiri",
+        no_sampel_asal: data.no_sampel_asal || "",
+        coding: data.coding || "",
+        jenis_pemeriksaan: data.jenis_pemeriksaan || "",
+        tgl_terima: formatDateForInput(data.tgl_terima),
+        tgl_pengambilan: formatDateForInput(data.tgl_pengambilan),
+        ket_pengerjaan: data.ket_pengerjaan || "",
+        ket_pengiriman: data.ket_pengiriman || "",
+        form_pe: data.form_pe || "",
+        no_reg: data.no_reg || "",
+        no_sampel_lab: data.no_sampel_lab || "",
       });
-
-      if (onSuccess) onSuccess();
     } catch (error) {
-      console.error("Full Error Object:", error);
-
-      // 2. LOGIC PENANGKAPAN ERROR
-      // Ambil pesan error dari respons backend jika ada
-      const message =
-        error.response?.data?.message || "Terjadi kesalahan pada server";
-      const detail =
-        error.response?.data?.stack || JSON.stringify(error.response?.data);
-
-      // Tampilkan di Toast
-      toast.error(`Gagal: ${message}`);
-
-      // Tampilkan di UI Box Merah agar user bisa baca detailnya
-      setServerError({ message, detail });
+      toast.error("Gagal mengambil data registrasi");
+      navigate("/dashboard");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+    if (serverError) setServerError(null);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setServerError(null);
+
+    // Sanitasi data: ubah string kosong menjadi null
+    const payload = {};
+    Object.keys(form).forEach((key) => {
+      if (key === "no_reg" || key === "no_sampel_lab") return; // Skip fields read-only
+      const value = form[key];
+      payload[key] = value === "" ? null : value;
+    });
+
+    try {
+      await api.put(`/registrations/${id}`, payload);
+      toast.success("Data registrasi berhasil diperbarui!");
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Full Error Object:", error);
+      const message =
+        error.response?.data?.message || "Terjadi kesalahan pada server";
+      const detail =
+        error.response?.data?.stack || JSON.stringify(error.response?.data);
+
+      toast.error(`Gagal: ${message}`);
+      setServerError({ message, detail });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-gray-500">Memuat data...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white p-6 rounded-xl shadow-md">
-      <h2 className="text-lg font-bold mb-4 border-b pb-2">
-        Formulir Pendaftaran Sampel
-      </h2>
+      <div className="flex items-center gap-3 mb-6">
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <h2 className="text-lg font-bold">Edit Registrasi: {form.no_reg}</h2>
+      </div>
 
-      {/* 3. ALERT BOX ERROR UI */}
-      {/* Ini akan muncul jika ada error, memberitahu detail masalahnya */}
-      {serverError && (
-        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg flex gap-3 items-start">
-          <XCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
-          <div className="overflow-hidden">
-            <h3 className="font-bold">Gagal Menyimpan Data</h3>
-            <p className="text-sm">{serverError.message}</p>
-            {/* Tampilkan detail teknis jika perlu debugging */}
-            <details className="mt-2 text-xs text-red-500 cursor-pointer">
-              <summary>Lihat Detail Teknis (Untuk Developer)</summary>
-              <pre className="mt-1 whitespace-pre-wrap break-words font-mono bg-red-100 p-2 rounded">
-                {serverError.detail}
-              </pre>
-            </details>
+      {/* Info Read-only */}
+      <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <label className="text-xs font-semibold text-gray-500">
+              No. Registrasi
+            </label>
+            <div className="font-medium">{form.no_reg}</div>
           </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500">
+              No. Sampel Lab
+            </label>
+            <div className="font-medium">{form.no_sampel_lab}</div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500">
+              Status
+            </label>
+            <div className="font-medium text-yellow-600">Sedang diedit</div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500">
+              Petugas Input
+            </label>
+            <div className="font-medium">{form.petugas_input || "-"}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Alert Error */}
+      {serverError && (
+        <div className="mb-6 bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg">
+          <h3 className="font-bold">Gagal Menyimpan Perubahan</h3>
+          <p className="text-sm">{serverError.message}</p>
+          <details className="mt-2 text-xs text-red-500 cursor-pointer">
+            <summary>Lihat Detail Teknis</summary>
+            <pre className="mt-1 whitespace-pre-wrap break-words font-mono bg-red-100 p-2 rounded">
+              {serverError.detail}
+            </pre>
+          </details>
         </div>
       )}
 
@@ -148,14 +203,14 @@ export default function RegistrationForm({ onSuccess }) {
           value={form.nama_pasien}
           onChange={handleChange}
           required
-          disabled={loading}
+          disabled={saving}
         />
         <Input
           label="NIK"
           name="nik"
           value={form.nik}
           onChange={handleChange}
-          disabled={loading}
+          disabled={saving}
         />
         <Input
           label="Tanggal Lahir"
@@ -163,7 +218,7 @@ export default function RegistrationForm({ onSuccess }) {
           name="tgl_lahir"
           value={form.tgl_lahir}
           onChange={handleChange}
-          disabled={loading}
+          disabled={saving}
         />
         <Input
           label="Umur (Th)"
@@ -171,7 +226,7 @@ export default function RegistrationForm({ onSuccess }) {
           name="umur"
           value={form.umur}
           onChange={handleChange}
-          disabled={loading}
+          disabled={saving}
         />
 
         <div className="flex flex-col">
@@ -182,7 +237,7 @@ export default function RegistrationForm({ onSuccess }) {
             name="jenis_kelamin"
             value={form.jenis_kelamin}
             onChange={handleChange}
-            disabled={loading}
+            disabled={saving}
             className="border p-2 rounded focus:ring-2 ring-blue-500 bg-white"
           >
             <option value="L">Laki-laki</option>
@@ -198,7 +253,7 @@ export default function RegistrationForm({ onSuccess }) {
           onChange={handleChange}
           pattern="[0-9 ]*"
           inputMode="numeric"
-          disabled={loading}
+          disabled={saving}
         />
 
         <div className="col-span-full">
@@ -209,7 +264,7 @@ export default function RegistrationForm({ onSuccess }) {
             name="alamat"
             value={form.alamat}
             onChange={handleChange}
-            disabled={loading}
+            disabled={saving}
             className="w-full border p-2 rounded focus:ring-2 ring-blue-500 h-20"
           ></textarea>
         </div>
@@ -224,21 +279,21 @@ export default function RegistrationForm({ onSuccess }) {
           value={form.asal_sampel}
           onChange={handleChange}
           placeholder="Contoh: Mandiri / RSUD..."
-          disabled={loading}
+          disabled={saving}
         />
         <Input
           label="No. Sampel Asal (Opsional)"
           name="no_sampel_asal"
           value={form.no_sampel_asal}
           onChange={handleChange}
-          disabled={loading}
+          disabled={saving}
         />
         <Input
           label="Coding / Kode Ins"
           name="coding"
           value={form.coding}
           onChange={handleChange}
-          disabled={loading}
+          disabled={saving}
         />
         <Input
           label="Jenis Pemeriksaan"
@@ -247,7 +302,7 @@ export default function RegistrationForm({ onSuccess }) {
           onChange={handleChange}
           placeholder="Kimia Darah, dll"
           required
-          disabled={loading}
+          disabled={saving}
         />
 
         <Input
@@ -256,7 +311,7 @@ export default function RegistrationForm({ onSuccess }) {
           name="tgl_terima"
           value={form.tgl_terima}
           onChange={handleChange}
-          disabled={loading}
+          disabled={saving}
         />
         <Input
           label="Tanggal Pengambilan"
@@ -264,7 +319,7 @@ export default function RegistrationForm({ onSuccess }) {
           name="tgl_pengambilan"
           value={form.tgl_pengambilan}
           onChange={handleChange}
-          disabled={loading}
+          disabled={saving}
         />
 
         <Input
@@ -273,7 +328,7 @@ export default function RegistrationForm({ onSuccess }) {
           value={form.ket_pengerjaan}
           onChange={handleChange}
           placeholder="Cth: Selesai Dikerjakan"
-          disabled={loading}
+          disabled={saving}
         />
         <Input
           label="Ket. Pengiriman"
@@ -281,25 +336,36 @@ export default function RegistrationForm({ onSuccess }) {
           value={form.ket_pengiriman}
           onChange={handleChange}
           placeholder="Cth: Sudah Dikirim"
-          disabled={loading}
+          disabled={saving}
         />
         <Input
           label="Form PE"
           name="form_pe"
           value={form.form_pe}
           onChange={handleChange}
-          disabled={loading}
+          disabled={saving}
         />
 
-        <div className="col-span-full mt-4">
+        <div className="col-span-full mt-4 flex gap-3">
           <button
             type="submit"
-            disabled={loading}
-            className={`w-full md:w-auto px-6 py-2 rounded-lg font-semibold text-white transition-colors
-              ${loading ? "bg-gray-400 cursor-not-allowed" : "bg-primary"}
+            disabled={saving}
+            className={`px-6 py-2 rounded-lg font-semibold text-white transition-colors
+              ${
+                saving
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-primary hover:bg-blue-700"
+              }
             `}
           >
-            {loading ? "Menyimpan..." : "Simpan Registrasi"}
+            {saving ? "Menyimpan..." : "Simpan Perubahan"}
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/dashboard")}
+            className="px-6 py-2 rounded-lg font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+          >
+            Batal
           </button>
         </div>
       </form>

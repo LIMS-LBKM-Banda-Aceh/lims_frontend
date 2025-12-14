@@ -36,6 +36,12 @@ export default function Dashboard() {
     setView("list");
   };
 
+  const handleLogout = () => {
+    if (confirm("Anda yakin ingin logout?")) {
+      logout();
+    }
+  };
+
   return (
     // Tambahkan print:bg-white agar background abu-abu hilang saat print
     <div className="min-h-screen bg-gray-50 print:bg-white">
@@ -57,7 +63,7 @@ export default function Dashboard() {
           </div>
         </div>
         <button
-          onClick={logout}
+          onClick={handleLogout}
           className="text-gray-500 hover:text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition flex items-center gap-2 text-sm font-medium"
         >
           <LogOut size={16} /> Keluar
@@ -99,14 +105,13 @@ export default function Dashboard() {
           {view === "create" && (
             <RegistrationForm onSuccess={() => setView("list")} />
           )}
-
           {view === "list" && (
             <RegistrationList
               data={registrations}
               onViewDetail={handleViewDetail}
+              onRefresh={fetchRegistrations} // Tambahkan ini
             />
           )}
-
           {view === "detail" && (
             <RegistrationDetail
               data={selectedRegistration}

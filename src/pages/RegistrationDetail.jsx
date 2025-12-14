@@ -27,14 +27,14 @@ export default function RegistrationDetail({ data, onBack }) {
   return (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden">
       {/* Header / Toolbar */}
-      <div className="bg-blue-600 p-6 text-white flex justify-between items-center">
+      <div className="bg-primary p-6 text-white flex justify-between items-center">
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
-            className="p-2 bg-blue-700 rounded-full hover:bg-blue-800 transition"
+            className="p-2 bg-cyan-400 rounded-full hover:bg-blue-800 transition"
             title="Kembali"
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft className="" size={20} />
           </button>
           <div>
             <h2 className="text-xl font-bold">Detail Registrasi</h2>
@@ -55,7 +55,7 @@ export default function RegistrationDetail({ data, onBack }) {
       <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Kolom Kiri: Identitas Pasien */}
         <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
-          <div className="flex items-center gap-2 mb-4 text-blue-700 border-b border-gray-200 pb-2">
+          <div className="flex items-center gap-2 mb-4 text-blue-400 border-b border-gray-200 pb-2">
             <User size={20} />
             <h3 className="font-bold text-lg">Identitas Pasien</h3>
           </div>
@@ -78,7 +78,7 @@ export default function RegistrationDetail({ data, onBack }) {
 
         {/* Kolom Kanan: Data Sampel */}
         <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
-          <div className="flex items-center gap-2 mb-4 text-purple-700 border-b border-gray-200 pb-2">
+          <div className="flex items-center gap-2 mb-4 text-cyan-700 border-b border-gray-200 pb-2">
             <FileText size={20} />
             <h3 className="font-bold text-lg">Data Sampel & Pemeriksaan</h3>
           </div>

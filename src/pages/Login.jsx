@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import labBg from "../assets/lab.jpg";
 
 export default function Login() {
   const [formData, setFormData] = useState({ username: "", password: "" });
@@ -14,13 +15,19 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100">
+    <div
+      className="flex min-h-screen items-center justify-center bg-gray-100 bg-cover bg-center"
+      style={{ backgroundImage: `url(${labBg})` }}
+    >
       <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg">
         <img
           src="/logo.svg"
           alt="Labkesmas Logo"
           className="mx-auto h-20 w-auto mb-4 space-y-10"
         />
+        <h1 className="text-center py-2 text-2xl text-gray-400 font-">
+          Selamat datang, silahkan login terlebih dahulu
+        </h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
@@ -52,10 +59,19 @@ export default function Login() {
           </div>
           <button
             type="submit"
-            className="w-full bg-primary text-white py-2 rounded-lg hover:bg-hover transition font-semibold"
+            className="w-full bg-primary text-white py-3 rounded-lg hover:bg-hover transition font-semibold"
           >
             Masuk Sistem
           </button>
+          <p className="text-center text-xs text-gray-500">
+            &copy;2025
+            <span className="font-semibold">
+              {" "}
+              Labolatory Information Management System
+              {" "}
+            </span>
+            Labkesmas Banda Aceh
+          </p>
         </form>
       </div>
     </div>
