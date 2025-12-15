@@ -1,24 +1,27 @@
+// App.jsx
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+// --- FIX 1: JANGAN LUPA IMPORT INI ---
+import LandingPage from "./pages/LandingPage";
+// -------------------------------------
+
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import RegistrationEdit from "./pages/RegistrationEdit"; // Import komponen edit
+import RegistrationEdit from "./pages/RegistrationEdit";
 
-// Komponen untuk melindungi route khusus user login
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) return <div>Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
-  
-  // Jika ada allowedRoles, cek role user
+
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
     return <Navigate to="/dashboard" replace />;
   }
-  
+
   return children;
 };
 
@@ -34,6 +37,10 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          {/* Route Halaman Utama (Landing Page) */}
+          <Route path="/" element={<LandingPage />} />
+
+          {/* Route Login */}
           <Route
             path="/login"
             element={
@@ -42,7 +49,8 @@ function App() {
               </PublicRoute>
             }
           />
-          
+
+          {/* Route Dashboard */}
           <Route
             path="/dashboard"
             element={
@@ -51,35 +59,26 @@ function App() {
               </ProtectedRoute>
             }
           />
-          
-          {/* Tambahkan route untuk edit registration */}
+
+          {/* Route Edit Registration */}
           <Route
             path="/registrations/edit/:id"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'input', 'lab']}>
+              <ProtectedRoute allowedRoles={["admin", "input", "lab"]}>
                 <RegistrationEdit />
               </ProtectedRoute>
             }
           />
-          
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          
-          {/* Fallback untuk halaman tidak ditemukan */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
+          {/* --- FIX 2: Hapus duplikasi path="/" yang lama --- */}
+          {/* Baris di bawah ini dihapus saja karena sudah ada LandingPage di atas */}
+          {/* <Route path="/" element={<Navigate to="/dashboard" replace />} /> */}
+
+          {/* Fallback jika halaman tidak ditemukan (404) -> Balik ke Home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-        
-        {/* Hanya SATU ToastContainer */}
-        <ToastContainer 
-          position="top-right" 
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-        />
+
+        <ToastContainer position="top-right" autoClose={3000} />
       </AuthProvider>
     </BrowserRouter>
   );
