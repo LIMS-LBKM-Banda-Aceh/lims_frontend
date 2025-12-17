@@ -17,9 +17,10 @@ import {
 
 // Components
 import Sidebar from "../components/Sidebar";
-import RegistrationForm from "./RegistrationsForm"; // Pastikan nama file sesuai (pake 's' atau tidak)
+import RegistrationForm from "./RegistrationsForm";
 import RegistrationList from "./RegistrationList";
 import RegistrationDetail from "./RegistrationDetail";
+import UserManagement from "./UserManagement";
 
 // --- Sub-Component: StatCard ---
 const StatCard = ({ title, value, icon: Icon, color, subtext }) => (
@@ -251,6 +252,8 @@ export default function Dashboard() {
                   onBack={handleBackToList}
                 />
               )}
+
+              {view === "users" && <UserManagement />}
             </div>
           )}
         </main>

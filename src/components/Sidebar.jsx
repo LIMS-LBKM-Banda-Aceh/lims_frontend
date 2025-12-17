@@ -2,11 +2,11 @@ import React from "react";
 import {
   LayoutDashboard,
   FileText,
-  Settings,
   LogOut,
   ChevronRight,
-  FlaskConical,
   PlusCircle,
+  ShieldCheck,
+  UserCog,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -19,20 +19,31 @@ export default function Sidebar({
   const { user, logout } = useAuth();
 
   const handleLogout = () => {
-    if (confirm("Yakin ingin keluar?")) {
+    if (confirm("Yakin ingin keluar dari aplikasi?")) {
       logout();
     }
   };
 
+  // Base Menu
   const menuItems = [
     { id: "overview", label: "Dashboard", icon: LayoutDashboard },
     { id: "list", label: "Data Pasien", icon: FileText },
     { id: "create", label: "Registrasi Baru", icon: PlusCircle },
   ];
 
+  // Menu Khusus Admin
+  if (user?.role === "admin") {
+    menuItems.push({
+      id: "users",
+      label: "Manajemen User",
+      icon: UserCog,
+      isAdmin: true,
+    });
+  }
+
   return (
     <>
-      {/* Overlay untuk Mobile */}
+      {/* Overlay Mobile */}
       {isMobileOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-20 md:hidden"
@@ -60,9 +71,8 @@ export default function Sidebar({
             Menu Utama
           </p>
           {menuItems.map((item) => {
-            const isActive =
-              currentView === item.id ||
-              (currentView === "detail" && item.id === "list");
+            const isActive = currentView === item.id;
+
             return (
               <button
                 key={item.id}
@@ -74,6 +84,10 @@ export default function Sidebar({
                   isActive
                     ? "bg-cyan-50 text-cyan-700 shadow-sm"
                     : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+                } ${
+                  item.isAdmin
+                    ? "border border-dashed border-cyan-100 mt-4 bg-cyan-50/30"
+                    : ""
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -90,33 +104,53 @@ export default function Sidebar({
                 {isActive && (
                   <ChevronRight size={16} className="text-cyan-500" />
                 )}
+                {/* Badge Admin Kecil */}
+                {item.isAdmin && !isActive && (
+                  <ShieldCheck size={14} className="text-cyan-300" />
+                )}
               </button>
             );
           })}
         </div>
 
-        {/* User Profile & Logout (Fixed at Bottom) */}
-        <div className="absolute bottom-0 w-full p-4 border-t border-gray-50 bg-gray-50/50">
-          <div className="flex items-center gap-3 mb-4 px-2">
-            <div className="w-10 h-10 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-700 font-bold border-2 border-white shadow-sm">
-              {user?.username?.charAt(0).toUpperCase()}
+        {/* --- CUSTOMIZED USER PROFILE & LOGOUT SECTION --- */}
+        <div className="absolute bottom-0 w-full p-4 border-t border-gray-50 bg-white">
+          <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-gray-50 border border-gray-100 transition-all duration-200 hover:shadow-md hover:border-blue-100 group">
+            {/* User Info Group */}
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div
+                className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center font-bold border-2 border-white shadow-sm ${
+                  user?.role === "admin"
+                    ? "bg-linear-to-br from-purple-100 to-purple-200 text-primary"
+                    : "bg-linear-to-br from-cyan-100 to-blue-200 text-cyan-700"
+                }`}
+              >
+                {user?.username?.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex flex-col min-w-0">
+                <p className="text-sm font-bold text-gray-800 truncate leading-tight group-hover:text-primary transition-colors">
+                  {user?.username}
+                </p>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide truncate">
+                    {user?.role || "Staff"}
+                  </span>
+                  {user?.role === "admin" && (
+                    <ShieldCheck size={10} className="text-primary" />
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="overflow-hidden">
-              <p className="text-sm font-bold text-gray-800 truncate">
-                {user?.username}
-              </p>
-              <p className="text-xs text-gray-500 truncate capitalize">
-                {user?.role || "Staff"}
-              </p>
-            </div>
-          </div>
 
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-red-500 rounded-lg text-sm font-medium hover:bg-red-50 hover:border-red-100 transition shadow-sm"
-          >
-            <LogOut size={16} /> Keluar Aplikasi
-          </button>
+            {/* Logout Button (Icon Only) */}
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-xl text-gray-400 hover:bg-white hover:text-red-500 hover:shadow-sm transition-all duration-200 shrink-0 focus:outline-none focus:ring-2 focus:ring-red-100"
+              title="Keluar Aplikasi"
+            >
+              <LogOut size={18} strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
       </aside>
     </>
