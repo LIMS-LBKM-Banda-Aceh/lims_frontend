@@ -1,3 +1,5 @@
+// src/components/Sidebar.jsx
+
 import React from "react";
 import {
   LayoutDashboard,
@@ -7,6 +9,7 @@ import {
   PlusCircle,
   ShieldCheck,
   UserCog,
+  Database,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -32,7 +35,24 @@ export default function Sidebar({
   ];
 
   // Menu Khusus Admin
+  // if (user?.role === "admin") {
+  //   menuItems.push({
+  //     id: "users",
+  //     label: "Manajemen User",
+  //     icon: UserCog,
+  //     isAdmin: true,
+  //   });
+  // }
+
   if (user?.role === "admin") {
+    // Tambahkan Menu Master Data sebelum User Management
+    menuItems.push({
+      id: "master",
+      label: "Master Pemeriksaan",
+      icon: Database,
+      isAdmin: true,
+    });
+
     menuItems.push({
       id: "users",
       label: "Manajemen User",
@@ -151,6 +171,9 @@ export default function Sidebar({
               <LogOut size={18} strokeWidth={2.5} />
             </button>
           </div>
+          <p className="text-xs text-gray-400 mt-4 text-center">
+            &copy; 2025 LIMS BLKM Banda Aceh
+          </p>
         </div>
       </aside>
     </>

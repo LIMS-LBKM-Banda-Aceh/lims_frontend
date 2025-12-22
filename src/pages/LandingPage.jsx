@@ -4,6 +4,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion"; // Animasi halus
 import lab3d from "../assets/3d.png";
+import docter3d from "../assets/3d_doctor.png";
 import {
   FlaskConical,
   Activity,
@@ -193,7 +194,7 @@ export default function LandingPage() {
             <ServiceCard
               icon={Search}
               title="Tracking Sampel"
-              desc="Pantau status pengerjaan sampel Anda secara realtime. Transparansi proses dari penerimaan hingga hasil keluar."
+              desc="Pantau status pengerjaan sampel secara realtime. Rincian detail proses dari penerimaan hingga hasil keluar."
               delay={0.2}
             />
             <ServiceCard
@@ -206,66 +207,89 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* --- PROFILE SECTION (Inspired by Ref) --- */}
+      {/* --- PROFILE SECTION --- */}
       <section
         id="profil"
-        className="py-24 bg-linear-to-br from-cyan-600 to-blue-700 text-white relative overflow-hidden"
+        className="py-24 bg-gradient-to-br from-cyan-600 to-primary text-white relative overflow-hidden"
       >
-        {/* Background Pattern */}
+        {/* Background Pattern - Diperhalus agar tidak mengganggu keterbacaan */}
         <div
-          className="absolute inset-0 opacity-10"
+          className="absolute inset-0 opacity-10 pointer-events-none"
           style={{
             backgroundImage:
               "radial-gradient(circle, #ffffff 1px, transparent 1px)",
-            backgroundSize: "30px 30px",
+            backgroundSize: "32px 32px",
           }}
         ></div>
 
         <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center relative z-10">
-          <div>
-            <h2 className="text-3xl lg:text-4xl font-bold mb-6">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="text-3xl lg:text-4xl font-bold mb-6 leading-tight">
               Profil BBLKM Banda Aceh
             </h2>
-            <p className="text-cyan-100 leading-relaxed mb-6 text-lg">
-              Assalamualaikum Wr.Wb.. <br></br>
-              Berdasarkan Peraturan Menteri Kesehatan Nomor 25 Tahun 2023 Balai
-              Penelitian dan Pengembangan Kesehatan Aceh telah bertransformasi
-              menjadi Balai Laboratorium Kesehatan Masyarakat Banda Aceh. Balai
-              Laboratorium Kesehatan Masyarakat Banda Aceh mempunyai tugas
-              melaksanakan Pengelolaan Laboratorium Kesehatan Masyarakat.
-            </p>
-            <p className="text-cyan-100 leading-relaxed mb-8">
-              Didukung oleh tenaga ahli yang kompeten dan peralatan modern, kami
-              siap memberikan pelayanan prima sesuai standar mutu internasional
-              demi peningkatan derajat kesehatan masyarakat.
-            </p>
-            <button className="bg-yellow-400 text-yellow-900 px-8 py-3 rounded-lg font-bold hover:bg-yellow-300 transition shadow-lg hover:shadow-yellow-400/50">
-              Baca Selengkapnya
-            </button>
-          </div>
+            <div className="space-y-4 text-cyan-50 leading-relaxed text-lg">
+              <p>
+                <span className="font-semibold text-white text-xl">
+                  Assalamualaikum Wr. Wb.
+                </span>
+                <br />
+                Berdasarkan Peraturan Menteri Kesehatan Nomor 25 Tahun 2023,
+                Balai Penelitian dan Pengembangan Kesehatan Aceh kini
+                bertransformasi menjadi
+                <span className="text-white font-medium">
+                  {" "}
+                  Balai Laboratorium Kesehatan Masyarakat Banda Aceh.
+                </span>
+              </p>
+              <p className="opacity-90">
+                Didukung oleh tenaga ahli yang kompeten dan peralatan modern,
+                kami siap memberikan pelayanan prima sesuai standar mutu
+                internasional demi peningkatan derajat kesehatan masyarakat.
+              </p>
+            </div>
 
-          <div className="relative">
-            {/* Placeholder untuk Ilustrasi Isometrik seperti referensi */}
+            <button className="mt-8 bg-white text-cyan-700 px-10 py-3.5 rounded-xl font-bold hover:bg-cyan-50 transition-all shadow-xl hover:shadow-cyan-900/20 active:scale-95">
+              Selengkapnya
+            </button>
+          </motion.div>
+
+          {/* Illustration Area - Fixed with Glow Effect */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, type: "spring" }}
+            viewport={{ once: true }}
+            className="relative flex justify-center items-center"
+          >
+            {/* Decorative Glow */}
+            <div className="absolute w-72 h-72 bg-cyan-400 rounded-full blur-[100px] opacity-30 animate-pulse"></div>
+
             <img
-              src="https://cdn3d.iconscout.com/3d/premium/thumb/lab-research-3d-illustration-download-in-png-blend-fbx-gltf-file-formats--science-laboratory-medical-chemistry-pack-healthcare-illustrations-4544778.png"
+              src={docter3d}
               alt="3D Lab Illustration"
-              className="w-full h-auto drop-shadow-2xl hover:scale-105 transition-transform duration-500"
+              className="w-full max-w-[450px] h-auto drop-shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-10 hover:translate-y-[-10px] transition-transform duration-500"
+              onError={(e) => {
+                e.target.src =
+                  "https://illustrations.popsy.co/white/medical-research.svg"; // Fallback jika link utama mati
+              }}
             />
-          </div>
+          </motion.div>
         </div>
 
-        {/* Curved Divider Bottom */}
-        <div className="absolute -bottom-1 left-0 w-full overflow-hidden leading-none">
+        {/* Curved Divider Bottom - Fixed Path & Anti-Gap */}
+        <div className="absolute top-0 left-0 w-full overflow-hidden leading-none">
           <svg
-            data-name="Layer 1"
-            xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 1200 120"
             preserveAspectRatio="none"
+            className="relative block w-[calc(100%+1.3px)] h-20"
+            fill="white"
           >
-            <path
-              d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z"
-              className="fill-white"
-            ></path>
+            <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z"></path>
           </svg>
         </div>
       </section>
@@ -309,13 +333,13 @@ export default function LandingPage() {
                 </div>
                 <div className="flex items-center gap-4">
                   <Mail className="text-cyan-600" />
-                  <p className="text-gray-600">ilabkesmasaceh@kemkes.go.id</p>
+                  <p className="text-gray-600">labkesmasaceh@kemkes.go.id</p>
                 </div>
               </div>
             </div>
 
             {/* Map Embed */}
-            <div className="bg-gray-200 rounded-2xl overflow-hidden h-64 shadow-inner">
+            <div className="bg-gray-200 rounded-2xl overflow-hidden h-74 shadow-inner">
               <iframe
                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3971.493245603183!2d95.3614462!3d5.5095249!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x30403845a4f33693%3A0xb07da876428a0d32!2sBalai%20Labkesmas%20Banda%20Aceh!5e0!3m2!1sid!2sid!4v1733730000000"
                 width="100%"

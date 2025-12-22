@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
-// --- FIX DISINI: Tambahkan PlusCircle dan List ke import ---
 import {
   Menu,
   Users,
@@ -11,8 +10,8 @@ import {
   CheckCircle2,
   Activity,
   Calendar,
-  PlusCircle, // <--- INI PENYEBAB BLANK PUTIH (Lupa import)
-  List, // <--- Tambahkan juga jaga-jaga
+  PlusCircle,
+  List,
 } from "lucide-react";
 
 // Components
@@ -21,7 +20,7 @@ import RegistrationForm from "./RegistrationsForm";
 import RegistrationList from "./RegistrationList";
 import RegistrationDetail from "./RegistrationDetail";
 import UserManagement from "./UserManagement";
-
+import MasterPemeriksaan from "./MasterPemeriksaan";
 // --- Sub-Component: StatCard ---
 const StatCard = ({ title, value, icon: Icon, color, subtext }) => (
   <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between hover:shadow-md transition-shadow">
@@ -37,7 +36,8 @@ const StatCard = ({ title, value, icon: Icon, color, subtext }) => (
 );
 
 // --- Sub-Component: Overview ---
-const DashboardOverview = ({ data, onChangeView }) => {
+// FIX: Tambahkan props onRefresh di sini agar List di overview juga bisa auto-refresh
+const DashboardOverview = ({ data, onChangeView, onRefresh }) => {
   const total = data.length;
   const selesai = data.filter((i) => i.status === "selesai").length;
   const proses = data.filter((i) => i.status !== "selesai").length;
@@ -90,9 +90,11 @@ const DashboardOverview = ({ data, onChangeView }) => {
           </button>
         </div>
 
+        {/* FIX: Passing onRefresh ke RegistrationList di dalam Overview */}
         <RegistrationList
           data={data.slice(0, 5)}
           onViewDetail={(item) => onChangeView("detail", item)}
+          onRefresh={onRefresh}
         />
       </div>
     </div>
@@ -108,25 +110,27 @@ export default function Dashboard() {
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchRegistrations();
-  }, []);
-
+  // Fungsi Fetch Data Utama
   const fetchRegistrations = async () => {
-    setLoading(true);
+    // Note: Jangan set loading true di sini jika ingin silent refresh (opsional)
+    // setLoading(true);
     try {
       const res = await api.get("/registrations");
-      // Safety check: pastikan res.data.data adalah array
       const rawData = Array.isArray(res.data.data) ? res.data.data : [];
       const sortedData = rawData.sort((a, b) => b.id - a.id);
       setRegistrations(sortedData);
     } catch (error) {
       console.error("Gagal ambil data", error);
-      setRegistrations([]); // Set array kosong jika error agar tidak crash
+      setRegistrations([]);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    setLoading(true); // Loading awal saja
+    fetchRegistrations();
+  }, []);
 
   const handleViewDetail = (item) => {
     setSelectedRegistration(item);
@@ -207,6 +211,7 @@ export default function Dashboard() {
                 <DashboardOverview
                   data={registrations}
                   onChangeView={handleChangeView}
+                  onRefresh={fetchRegistrations} // FIX: Pass onRefresh
                 />
               )}
 
@@ -230,14 +235,15 @@ export default function Dashboard() {
                         Kelola seluruh data registrasi laboratorium.
                       </p>
                     </div>
-                    {/* Component PlusCircle ini yang bikin crash sebelumnya */}
                     <button
                       onClick={() => setView("create")}
-                      className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-lg shadow-blue-200 hover:shadow-blue-300 hover:-translate-y-1 transition-all flex items-center gap-2"
+                      className="bg-cyan-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-lg shadow-cyan-200 hover:shadow-cyan-300 hover:-translate-y-1 transition-all flex items-center gap-2"
                     >
                       <PlusCircle size={18} /> Tambah Baru
                     </button>
                   </div>
+
+                  {/* FIX: List Utama sudah benar, pastikan fetchRegistrations dipassing */}
                   <RegistrationList
                     data={registrations}
                     onViewDetail={handleViewDetail}
@@ -252,7 +258,7 @@ export default function Dashboard() {
                   onBack={handleBackToList}
                 />
               )}
-
+              {view === "master" && <MasterPemeriksaan />}
               {view === "users" && <UserManagement />}
             </div>
           )}

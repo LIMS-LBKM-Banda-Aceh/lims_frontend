@@ -1,36 +1,51 @@
 // pages/RegistrationList.jsx
-
-import { Eye, Edit, Trash2, MoreHorizontal } from "lucide-react";
+import { Eye, Edit, Trash2, MoreHorizontal, Wallet } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import { toast } from "react-toastify";
+import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
 
 export default function RegistrationList({ data, onViewDetail, onRefresh }) {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // --- FIX SAFETY: Fungsi aman format tanggal ---
   const formatDateSafe = (dateString) => {
-    if (!dateString) return "-"; // Jika null/undefined, return strip
+    if (!dateString) return "-";
     try {
       return new Date(dateString).toLocaleDateString("id-ID", {
         day: "numeric",
         month: "short",
       });
     } catch (e) {
-      return "-"; // Jika format tanggal invalid, return strip
+      return "-";
     }
   };
 
+  const formatRupiah = (num) => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+    }).format(num || 0);
+  };
+
+  // --- LOGIC HAPUS & REFRESH ---
   const handleDelete = async (id, noReg) => {
     if (!confirm(`Yakin ingin menghapus registrasi ${noReg}?`)) return;
 
     try {
       await api.delete(`/registrations/${id}`);
       toast.success("Registrasi berhasil dihapus");
-      if (onRefresh) onRefresh();
+
+      // PENTING: Memanggil fungsi parent untuk ambil data ulang
+      if (onRefresh) {
+        onRefresh();
+      } else {
+        console.warn("onRefresh prop not passed to RegistrationList");
+      }
     } catch (error) {
+      console.error(error);
       if (error.response?.status !== 200) {
         toast.error(
           error.response?.data?.message || "Gagal menghapus registrasi"
@@ -48,6 +63,7 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
       selesai: "bg-green-100 text-green-700 border-green-200",
       terdaftar: "bg-blue-50 text-blue-700 border-blue-200",
       proses: "bg-yellow-50 text-yellow-700 border-yellow-200",
+      tervalidasi: "bg-purple-50 text-purple-700 border-purple-200",
     };
     const style = styles[status] || "bg-gray-100 text-gray-600 border-gray-200";
 
@@ -71,9 +87,8 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
   };
 
   if (!data || data.length === 0)
-    // Tambahkan check !data
     return (
-      <div className="flex flex-col items-center justify-center p-16 bg-white rounded-2xl border border-dashed border-gray-300 text-center">
+      <div className="flex flex-col items-center justify-center p-16 bg-white rounded-2xl border border-dashed border-gray-300 text-center animate-fade-in">
         <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
           <MoreHorizontal className="text-gray-400" />
         </div>
@@ -85,7 +100,7 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
     );
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden animate-fade-in">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead className="bg-gray-50/50 text-gray-500 border-b border-gray-200">
@@ -97,10 +112,10 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
                 No. Reg / Sampel
               </th>
               <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider">
-                Pemeriksaan
+                Pemeriksaan & Biaya
               </th>
               <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider">
-                Status & Asal
+                Status
               </th>
               <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-center">
                 Aksi
@@ -113,6 +128,7 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
                 key={item.id}
                 className="hover:bg-gray-50/80 transition-colors duration-200 group"
               >
+                {/* Info Pasien */}
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-cyan-100 flex items-center justify-center text-cyan-700 font-bold text-xs border border-blue-50">
@@ -130,6 +146,7 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
                   </div>
                 </td>
 
+                {/* No Reg */}
                 <td className="px-6 py-4">
                   <div className="flex flex-col items-start gap-1">
                     <span className="font-mono text-xs font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
@@ -141,16 +158,24 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
                   </div>
                 </td>
 
+                {/* Pemeriksaan & Biaya */}
                 <td className="px-6 py-4">
-                  <span className="text-sm text-gray-700 font-medium">
+                  <div
+                    className="max-w-[200px] truncate text-sm text-gray-700 font-medium"
+                    title={item.jenis_pemeriksaan}
+                  >
                     {item.jenis_pemeriksaan}
-                  </span>
-                  <div className="text-[11px] text-gray-400 mt-1">
-                    {/* Gunakan formatDateSafe disini */}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1 text-cyan-700 font-bold text-xs">
+                    <Wallet size={12} />
+                    {formatRupiah(item.total_biaya)}
+                  </div>
+                  <div className="text-[11px] text-gray-400 mt-0.5">
                     Terima: {formatDateSafe(item.tgl_terima)}
                   </div>
                 </td>
 
+                {/* Status */}
                 <td className="px-6 py-4">
                   <div className="flex flex-col gap-2 items-start">
                     <StatusBadge status={item.status} />
@@ -161,6 +186,7 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
                   </div>
                 </td>
 
+                {/* Aksi */}
                 <td className="px-6 py-4">
                   <div className="flex justify-center items-center gap-2">
                     <button
@@ -200,11 +226,15 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
         </table>
       </div>
 
-      {/* Footer Pagination */}
       <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 text-xs text-gray-500 flex justify-between items-center">
         <span>Menampilkan {data.length} data terbaru</span>
-        <div className="flex gap-2">{/* ... tombol pagination ... */}</div>
       </div>
     </div>
   );
 }
+
+RegistrationList.propTypes = {
+  data: PropTypes.array.isRequired,
+  onViewDetail: PropTypes.func.isRequired,
+  onRefresh: PropTypes.func.isRequired,
+};
