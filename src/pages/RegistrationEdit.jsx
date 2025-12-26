@@ -1,4 +1,3 @@
-// pages/RegistrationEdit.jsx
 import { useState, useEffect } from "react";
 import api from "../api/axios";
 import { toast } from "react-toastify";
@@ -9,12 +8,22 @@ import {
   AlertCircle,
   CheckCircle2,
   Search,
+  Clock, // [NEW] Tambahkan Clock icon
+  CalendarDays, // [NEW] Tambahkan CalendarDays
 } from "lucide-react";
 
-// --- Form Components (Bisa dipisah ke file components/Forms.jsx) ---
-const FormInput = ({ label, type = "text", disabled, ...props }) => (
+// --- Form Components ---
+const FormInput = ({
+  label,
+  type = "text",
+  disabled,
+  icon: Icon,
+  ...props
+}) => (
   <div className="space-y-1.5">
-    <label className="text-sm font-semibold text-gray-700">{label}</label>
+    <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+      {Icon && <Icon size={14} className="text-gray-500" />} {label}
+    </label>
     <input
       type={type}
       disabled={disabled}
@@ -40,11 +49,10 @@ const FormSelect = ({ label, children, ...props }) => (
   </div>
 );
 
-// --- Component Selector (Copy dari RegistrationForm agar konsisten) ---
+// --- Component Selector ---
 const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Group logic ...
   const groupedData = masterData.reduce((acc, item) => {
     if (!acc[item.kategori]) acc[item.kategori] = [];
     acc[item.kategori].push(item);
@@ -144,6 +152,9 @@ export default function RegistrationEdit() {
   const [selectedPemeriksaanIds, setSelectedPemeriksaanIds] = useState([]);
   const [totalBiaya, setTotalBiaya] = useState(0);
 
+  // [NEW] State untuk list item detail di footer
+  const [selectedItemsDetails, setSelectedItemsDetails] = useState([]);
+
   const [form, setForm] = useState({
     nama_pasien: "",
     nik: "",
@@ -156,6 +167,7 @@ export default function RegistrationEdit() {
     no_sampel_asal: "",
     coding: "",
     tgl_terima: "",
+    waktu_sampling: "", // [NEW] Field waktu
     tgl_pengambilan: "",
     no_reg: "",
     no_sampel_lab: "",
@@ -182,11 +194,11 @@ export default function RegistrationEdit() {
           ...data,
           tgl_lahir: formatDate(data.tgl_lahir),
           tgl_terima: formatDate(data.tgl_terima),
+          waktu_sampling: data.waktu_sampling || "", // [NEW] Load waktu
           tgl_pengambilan: formatDate(data.tgl_pengambilan),
         });
 
-        // 3. Set Selected IDs (Jika backend mengirim detail_ids atau array details)
-        // Jika backend belum support, ini akan kosong, user perlu pilih ulang jika ingin edit item.
+        // 3. Set Selected IDs
         if (data.details && Array.isArray(data.details)) {
           setSelectedPemeriksaanIds(data.details.map((d) => d.pemeriksaan_id));
         } else if (data.pemeriksaan_ids) {
@@ -202,22 +214,46 @@ export default function RegistrationEdit() {
     initData();
   }, [id, navigate]);
 
-  // Hitung ulang total biaya realtime
+  // Hitung ulang total biaya realtime & Update Details
   useEffect(() => {
-    const total = masterPemeriksaan
-      .filter((item) => selectedPemeriksaanIds.includes(item.id))
-      .reduce((sum, item) => sum + Number(item.harga), 0);
+    const selectedItems = masterPemeriksaan.filter((item) =>
+      selectedPemeriksaanIds.includes(item.id)
+    );
+
+    // Update display items
+    setSelectedItemsDetails(selectedItems);
+
+    const total = selectedItems.reduce(
+      (sum, item) => sum + Number(item.harga),
+      0
+    );
     setTotalBiaya(total);
   }, [selectedPemeriksaanIds, masterPemeriksaan]);
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
 
+  // [NEW] Auto Age Calculator juga perlu di Edit jika tgl lahir diubah
+  useEffect(() => {
+    if (form.tgl_lahir) {
+      const today = new Date();
+      const birthDate = new Date(form.tgl_lahir);
+
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      // Hanya update umur jika user mengubah tgl lahir (opsional, tapi bagus untuk konsistensi)
+      setForm((prev) => ({ ...prev, umur: age < 0 ? 0 : age }));
+    }
+  }, [form.tgl_lahir]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
 
-    // Siapkan payload
     const {
       no_reg,
       no_sampel_lab,
@@ -231,10 +267,9 @@ export default function RegistrationEdit() {
 
     const payload = {
       ...cleanForm,
-      pemeriksaan_ids: selectedPemeriksaanIds, // Kirim array ID terbaru
+      pemeriksaan_ids: selectedPemeriksaanIds,
     };
 
-    // Bersihkan null
     Object.keys(payload).forEach((k) => {
       if (payload[k] === "") payload[k] = null;
     });
@@ -257,13 +292,8 @@ export default function RegistrationEdit() {
       currency: "IDR",
     }).format(num);
 
-  // ... (Bagian import dan logic state di atas TETAP SAMA, tidak perlu diubah)
-
-  // GANTI BAGIAN RETURN DI BAWAH INI:
   return (
     <div className="min-h-screen bg-gray-50 font-sans pb-20">
-      {" "}
-      {/* Tambah pb-20 agar scroll tidak mentok */}
       <div className="max-w-6xl mx-auto py-10 px-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -351,6 +381,7 @@ export default function RegistrationEdit() {
                       name="umur"
                       value={form.umur}
                       onChange={handleChange}
+                      placeholder="Otomatis"
                     />
                     <FormSelect
                       label="Jenis Kelamin"
@@ -398,13 +429,25 @@ export default function RegistrationEdit() {
                       value={form.no_sampel_asal}
                       onChange={handleChange}
                     />
+
+                    {/* [NEW] Baris Tanggal dan Jam Terima */}
                     <FormInput
                       label="Tgl Terima"
                       type="date"
                       name="tgl_terima"
                       value={form.tgl_terima}
                       onChange={handleChange}
+                      icon={CalendarDays}
                     />
+                    <FormInput
+                      label="Jam Terima"
+                      type="time"
+                      name="waktu_sampling"
+                      value={form.waktu_sampling}
+                      onChange={handleChange}
+                      icon={Clock}
+                    />
+
                     <FormInput
                       label="Coding"
                       name="coding"
@@ -420,9 +463,6 @@ export default function RegistrationEdit() {
                 <h3 className="font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100">
                   Item Pemeriksaan
                 </h3>
-                {/* PERUBAHAN 1: Hapus div 'Total Biaya' dari sini.
-                    Biarkan Selector mengambil sisa ruang yang ada.
-                */}
                 <ExaminationSelector
                   masterData={masterPemeriksaan}
                   selectedIds={selectedPemeriksaanIds}
@@ -431,29 +471,40 @@ export default function RegistrationEdit() {
               </div>
             </div>
 
-            {/* PERUBAHAN 2: ACTION BAR BARU (FOOTER)
-                Ini memisahkan area scroll form dengan area aksi & harga.
-                Menggunakan bg-gray-50 dan border-t untuk visual yang jelas.
-            */}
-            <div className="mt-auto bg-gray-50 border-t border-gray-200 p-6 flex flex-col md:flex-row justify-between items-center gap-4">
-              {/* Bagian Kiri: Total Harga */}
-              <div className="flex items-center gap-4">
-                <div className="bg-yellow-100 p-3 rounded-xl text-yellow-700">
-                  {/* Icon Wallet/Tag bisa ditaruh sini jika mau */}
+            {/* ACTION BAR (FOOTER) */}
+            <div className="mt-auto bg-gray-50 border-t border-gray-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              {/* Bagian Kiri: Total Harga & Summary Items */}
+              <div className="flex items-start gap-4 flex-1">
+                <div className="bg-yellow-100 p-3 rounded-xl text-yellow-700 shrink-0">
                   <span className="font-bold text-xl">Rp</span>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">
-                    Total Estimasi Biaya
-                  </p>
-                  <p className="text-2xl font-bold text-gray-800">
-                    {formatRupiah(totalBiaya)}
-                  </p>
+
+                <div className="flex flex-col w-full max-w-sm">
+                  <div>
+                    <p className="text-sm text-gray-500 font-medium">
+                      Total Estimasi Biaya
+                    </p>
+                    <p className="text-2xl font-bold text-gray-800">
+                      {formatRupiah(totalBiaya)}
+                    </p>
+                  </div>
+
+                  {/* [NEW] LIST ITEM TERPILIH DI FOOTER */}
+                  {selectedItemsDetails.length > 0 && (
+                    <div className="mt-2 text-xs text-gray-600 max-h-20 overflow-y-auto custom-scrollbar border-l-2 border-yellow-300 pl-2">
+                      {selectedItemsDetails.map((item, idx) => (
+                        <span key={item.id}>
+                          {item.nama_pemeriksaan}
+                          {idx < selectedItemsDetails.length - 1 ? ", " : ""}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Bagian Kanan: Tombol Aksi */}
-              <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="flex items-center gap-3 w-full md:w-auto shrink-0">
                 <button
                   type="button"
                   onClick={() => navigate("/dashboard")}

@@ -3,16 +3,16 @@ import api from "../api/axios";
 import { toast } from "react-toastify";
 import {
   Save,
-  X,
   User,
   FlaskConical,
   CalendarDays,
   FileSpreadsheet,
   CheckCircle2,
   Search,
+  Clock, // Pastikan Clock diimport
 } from "lucide-react";
 
-// --- Reusable Modern Form Components ---
+// --- Reusable Components (FormInput, FormSelect, FormTextarea) TETAP SAMA ---
 const FormInput = ({ label, icon: Icon, type = "text", ...props }) => (
   <div className="space-y-1.5">
     <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -37,7 +37,6 @@ const FormSelect = ({ label, children, ...props }) => (
       >
         {children}
       </select>
-      {/* Icon chevron */}
       <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-gray-500">
         ▼
       </div>
@@ -55,11 +54,10 @@ const FormTextarea = ({ label, ...props }) => (
   </div>
 );
 
-// --- COMPONENT BARU: PILIH PEMERIKSAAN ---
+// --- EXAMINATION SELECTOR TETAP SAMA ---
 const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Group data by category
   const groupedData = masterData.reduce((acc, item) => {
     if (!acc[item.kategori]) acc[item.kategori] = [];
     acc[item.kategori].push(item);
@@ -74,7 +72,6 @@ const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
     }
   };
 
-  // Format Rupiah
   const formatRupiah = (num) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -103,7 +100,6 @@ const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
 
       <div className="max-h-[300px] overflow-y-auto space-y-4 pr-2 custom-scrollbar">
         {Object.entries(groupedData).map(([category, items]) => {
-          // Filter items based on search
           const filteredItems = items.filter((item) =>
             item.nama_pemeriksaan
               .toLowerCase()
@@ -153,13 +149,16 @@ const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
   );
 };
 
+// --- MAIN COMPONENT ---
 export default function RegistrationForm({ onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [masterPemeriksaan, setMasterPemeriksaan] = useState([]);
   const [selectedPemeriksaanIds, setSelectedPemeriksaanIds] = useState([]);
   const [totalBiaya, setTotalBiaya] = useState(0);
 
-  // Fetch Master Data saat komponen dimuat
+  // [NEW] State untuk menyimpan detail item yang dipilih (untuk display)
+  const [selectedItemsDetails, setSelectedItemsDetails] = useState([]);
+
   useEffect(() => {
     const fetchMaster = async () => {
       try {
@@ -175,11 +174,21 @@ export default function RegistrationForm({ onSuccess }) {
     fetchMaster();
   }, []);
 
-  // Hitung Total Biaya setiap kali seleksi berubah
+  // Hitung Total Biaya & Update List Detail Item
   useEffect(() => {
-    const total = masterPemeriksaan
-      .filter((item) => selectedPemeriksaanIds.includes(item.id))
-      .reduce((sum, item) => sum + Number(item.harga), 0);
+    // Filter item master berdasarkan ID yang dipilih
+    const selectedItems = masterPemeriksaan.filter((item) =>
+      selectedPemeriksaanIds.includes(item.id)
+    );
+
+    // Update state detail untuk ditampilkan
+    setSelectedItemsDetails(selectedItems);
+
+    // Hitung total
+    const total = selectedItems.reduce(
+      (sum, item) => sum + Number(item.harga),
+      0
+    );
     setTotalBiaya(total);
   }, [selectedPemeriksaanIds, masterPemeriksaan]);
 
@@ -194,8 +203,11 @@ export default function RegistrationForm({ onSuccess }) {
     asal_sampel: "mandiri",
     no_sampel_asal: "",
     coding: "",
-    // jenis_pemeriksaan dihapus karena digantikan selection
     tgl_terima: new Date().toISOString().split("T")[0],
+    waktu_sampling: new Date().toLocaleTimeString("it-IT", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
     tgl_pengambilan: "",
     ket_pengerjaan: "",
     ket_pengiriman: "",
@@ -204,6 +216,23 @@ export default function RegistrationForm({ onSuccess }) {
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
+
+  // Auto Calculate Age
+  useEffect(() => {
+    if (form.tgl_lahir) {
+      const today = new Date();
+      const birthDate = new Date(form.tgl_lahir);
+
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+
+      setForm((prev) => ({ ...prev, umur: age < 0 ? 0 : age }));
+    }
+  }, [form.tgl_lahir]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -216,10 +245,9 @@ export default function RegistrationForm({ onSuccess }) {
 
     const payload = {
       ...form,
-      pemeriksaan_ids: selectedPemeriksaanIds, // Kirim array ID
+      pemeriksaan_ids: selectedPemeriksaanIds,
     };
 
-    // Bersihkan nilai null/empty string
     Object.keys(payload).forEach((key) => {
       if (payload[key] === "") payload[key] = null;
     });
@@ -229,8 +257,15 @@ export default function RegistrationForm({ onSuccess }) {
       toast.success("Registrasi berhasil dibuat!");
       if (onSuccess) onSuccess();
 
-      // Reset Form
-      setForm({ ...form, nama_pasien: "", nik: "" });
+      setForm({
+        ...form,
+        nama_pasien: "",
+        nik: "",
+        waktu_sampling: new Date().toLocaleTimeString("it-IT", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      });
       setSelectedPemeriksaanIds([]);
     } catch (error) {
       toast.error(error.response?.data?.message || "Gagal menyimpan data");
@@ -243,6 +278,7 @@ export default function RegistrationForm({ onSuccess }) {
     new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
+      minimumFractionDigits: 0,
     }).format(num);
 
   return (
@@ -295,6 +331,7 @@ export default function RegistrationForm({ onSuccess }) {
                 name="umur"
                 value={form.umur}
                 onChange={handleChange}
+                placeholder="Otomatis"
               />
             </div>
 
@@ -330,7 +367,7 @@ export default function RegistrationForm({ onSuccess }) {
 
         <hr className="border-gray-100" />
 
-        {/* SECTION 2: DATA PEMERIKSAAN (REVISED) */}
+        {/* SECTION 2: DATA PEMERIKSAAN */}
         <div>
           <h3 className="text-base font-bold text-cyan-700 mb-4 flex items-center gap-2">
             <FlaskConical size={18} /> Pilih Pemeriksaan
@@ -348,16 +385,42 @@ export default function RegistrationForm({ onSuccess }) {
 
             {/* Bagian Kanan: Summary Biaya & Info Sampel */}
             <div className="space-y-4">
-              <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100">
-                <p className="text-sm text-cyan-800 mb-1">
-                  Total Estimasi Biaya
-                </p>
-                <p className="text-2xl font-bold text-cyan-700">
-                  {formatRupiah(totalBiaya)}
-                </p>
-                <p className="text-xs text-cyan-600 mt-2">
-                  {selectedPemeriksaanIds.length} item dipilih
-                </p>
+              <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100 flex flex-col h-auto">
+                <div>
+                  <p className="text-sm text-cyan-800 mb-1">
+                    Total Estimasi Biaya
+                  </p>
+                  <p className="text-2xl font-bold text-cyan-700">
+                    {formatRupiah(totalBiaya)}
+                  </p>
+                </div>
+
+                {/* [NEW] DAFTAR ITEM YANG DIPILIH */}
+                {selectedItemsDetails.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-cyan-200/50">
+                    <p className="text-[10px] uppercase font-bold text-cyan-800 mb-2">
+                      Item Terpilih:
+                    </p>
+                    <ul className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+                      {selectedItemsDetails.map((item) => (
+                        <li
+                          key={item.id}
+                          className="text-xs text-cyan-900 flex justify-between border-b border-cyan-100 pb-1 last:border-0"
+                        >
+                          <span
+                            className="truncate w-2/3"
+                            title={item.nama_pemeriksaan}
+                          >
+                            {item.nama_pemeriksaan}
+                          </span>
+                          <span className="font-mono text-cyan-700">
+                            {formatRupiah(item.harga).split(",")[0]}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <FormInput
@@ -368,14 +431,25 @@ export default function RegistrationForm({ onSuccess }) {
                 placeholder="Mandiri / RSUD..."
               />
 
-              <FormInput
-                label="Tgl Terima Sampel"
-                type="date"
-                name="tgl_terima"
-                value={form.tgl_terima}
-                onChange={handleChange}
-                icon={CalendarDays}
-              />
+              <div className="grid grid-cols-2 gap-3">
+                <FormInput
+                  label="Tgl Terima"
+                  type="date"
+                  name="tgl_terima"
+                  value={form.tgl_terima}
+                  onChange={handleChange}
+                  icon={CalendarDays}
+                />
+
+                <FormInput
+                  label="Jam Terima"
+                  type="time"
+                  name="waktu_sampling"
+                  value={form.waktu_sampling}
+                  onChange={handleChange}
+                  icon={Clock}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -409,7 +483,6 @@ export default function RegistrationForm({ onSuccess }) {
           </div>
         </div>
 
-        {/* BUTTONS */}
         <div className="flex items-center gap-4 pt-4 border-t border-gray-100">
           <button
             type="submit"

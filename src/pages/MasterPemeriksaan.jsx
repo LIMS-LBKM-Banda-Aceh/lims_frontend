@@ -28,7 +28,10 @@ export default function MasterPemeriksaan() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Semua");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10); // Menampilkan 10 data per halaman
+
+  // [MODIFIKASI 1] Ubah state itemsPerPage agar bisa di-set (default 10)
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
   const [sortConfig, setSortConfig] = useState({
     key: "nama_pemeriksaan",
     direction: "asc",
@@ -121,6 +124,12 @@ export default function MasterPemeriksaan() {
       direction = "desc";
     }
     setSortConfig({ key, direction });
+  };
+
+  // [MODIFIKASI 2] Handler untuk mengubah jumlah baris
+  const handleItemsPerPageChange = (e) => {
+    setItemsPerPage(Number(e.target.value));
+    setCurrentPage(1); // Reset ke halaman 1 agar UX lebih baik
   };
 
   // --- NEW: FORMATTER HARGA INPUT ---
@@ -374,14 +383,32 @@ export default function MasterPemeriksaan() {
           </table>
         </div>
 
-        {/* Pagination Footer */}
+        {/* [MODIFIKASI 3] Pagination Footer yang Diperbarui */}
         {processedData.length > 0 && (
-          <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
-            <span className="text-xs text-gray-500">
-              Menampilkan {indexOfFirstItem + 1}-
-              {Math.min(indexOfLastItem, processedData.length)} dari{" "}
-              {processedData.length} data
-            </span>
+          <div className="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50/50">
+            {/* Bagian Kiri: Info Data & Selector Rows */}
+            <div className="flex items-center gap-4 text-sm text-gray-500">
+              <span>
+                Menampilkan {indexOfFirstItem + 1}-
+                {Math.min(indexOfLastItem, processedData.length)} dari{" "}
+                {processedData.length} data
+              </span>
+
+              <div className="flex items-center gap-2 pl-4 border-l border-gray-200">
+                <span>Tampilkan:</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={handleItemsPerPageChange}
+                  className="bg-white border border-gray-300 text-gray-700 text-xs rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-1.5"
+                >
+                  <option value={10}>10</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Bagian Kanan: Navigasi Page */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
@@ -390,9 +417,11 @@ export default function MasterPemeriksaan() {
               >
                 <ChevronLeft size={16} />
               </button>
-              {/* Page Indicator */}
-              <div className="flex gap-1">
+
+              {/* Logic Page Indicator (Keep Simple or Full) */}
+              <div className="flex gap-1 hidden sm:flex">
                 {[...Array(totalPages)].map((_, i) => {
+                  // Logic agar tidak menampilkan semua angka jika halamannya banyak
                   if (
                     totalPages > 5 &&
                     i !== 0 &&
@@ -422,6 +451,7 @@ export default function MasterPemeriksaan() {
                   );
                 })}
               </div>
+
               <button
                 onClick={() =>
                   setCurrentPage((prev) => Math.min(prev + 1, totalPages))

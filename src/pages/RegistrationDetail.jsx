@@ -255,10 +255,17 @@ export default function RegistrationDetail({ data, onBack }) {
                   <span className="text-gray-500">Asal</span>
                   <span className="col-span-2">{data.asal_sampel}</span>
                 </div>
-                <div className="grid grid-cols-3">
+                {/* <div className="grid grid-cols-3">
                   <span className="text-gray-500">Tgl Terima</span>
                   <span className="col-span-2">
                     {formatDate(data.tgl_terima)}
+                  </span>
+                </div> */}
+                <div className="grid grid-cols-3">
+                  <span className="text-gray-500">Tgl & Jam Terima</span>
+                  <span className="col-span-2">
+                    {formatDate(data.tgl_terima)} —{" "}
+                    {data.waktu_sampling?.slice(0, 5) || "00:00"} WIB
                   </span>
                 </div>
                 <div className="grid grid-cols-3">

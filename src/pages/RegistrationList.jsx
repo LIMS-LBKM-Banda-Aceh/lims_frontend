@@ -171,7 +171,10 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
                     {formatRupiah(item.total_biaya)}
                   </div>
                   <div className="text-[11px] text-gray-400 mt-0.5">
-                    Terima: {formatDateSafe(item.tgl_terima)}
+                    {/* Terima: {formatDateSafe(item.tgl_terima)} */}
+                    Terima: {formatDateSafe(item.tgl_terima)}{" "}
+                    <span className="text-gray-300">|</span>{" "}
+                    {item.waktu_sampling?.slice(0, 5) || "-"}
                   </div>
                 </td>
 

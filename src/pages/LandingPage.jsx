@@ -253,9 +253,14 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <button className="mt-8 bg-white text-cyan-700 px-10 py-3.5 rounded-xl font-bold hover:bg-cyan-50 transition-all shadow-xl hover:shadow-cyan-900/20 active:scale-95">
+            <a
+              href="https://www.labkesmas-aceh.go.id/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-8 bg-white text-cyan-700 px-10 py-3.5 rounded-xl font-bold hover:bg-cyan-50 transition-all shadow-xl hover:shadow-cyan-900/20 active:scale-95"
+            >
               Selengkapnya
-            </button>
+            </a>
           </motion.div>
 
           {/* Illustration Area - Fixed with Glow Effect */}
