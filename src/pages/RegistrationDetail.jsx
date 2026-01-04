@@ -126,33 +126,14 @@ export default function RegistrationDetail({ data, onBack }) {
 
       {/* KOP SURAT (Hanya Print) */}
       <div className="hidden print:flex justify-between items-center border-b-2 border-black pb-4 mb-6">
-        <div className="text-left space-y-1">
-          <h1 className="text-xl font-bold uppercase text-black leading-none">
-            Kementerian Kesehatan RI
-          </h1>
-          <h2 className="text-lg font-bold uppercase text-black leading-none">
-            Balai Besar Labkesmas Banda Aceh
-          </h2>
-          <p className="text-xs text-black mt-1">
-            Jl. Bandara SIM Blang Bintang Lr. Biomedis No. 9,
-            <br />
-            Kecamatan Ingin Jaya Kabupaten Aceh Besar Provinsi Aceh <br />
-            Kode Pos 23317 <br />
-            Telepon: 0651-8070189
-            <br /> Whatsapp: 0811-6107-253 <br />
-            E-mail: labkesmasaceh@kemkes.go.id
-          </p>
-        </div>
-        <div className="flex items-center">
           <img
-            src="/logo.svg"
+            src="/src/assets/kop_mail.png"
             alt="Logo"
-            className="h-16 w-auto object-contain"
+            className="w-auto object-contain"
             onError={(e) => {
               e.target.style.display = "none";
             }}
           />
-        </div>
       </div>
 
       {/* Judul Print */}
@@ -174,7 +155,7 @@ export default function RegistrationDetail({ data, onBack }) {
       {/* Main Content */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden print:shadow-none print:border-0 print:rounded-none">
         {/* Header Warna (Hilang di print, ganti border simple) */}
-        <div className="bg-gradient-to-r from-cyan-600 to-blue-600 p-8 text-white print:bg-none print:p-0 print:text-black print:mb-4 print:border-b print:border-dashed print:pb-4">
+        <div className="bg-linear-to-r from-cyan-600 to-blue-600 p-8 text-white print:bg-none print:p-0 print:text-black print:mb-4 print:border-b print:border-dashed print:pb-4">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-cyan-100 text-sm font-medium mb-1 print:text-gray-500 print:text-xs print:uppercase">
@@ -255,12 +236,6 @@ export default function RegistrationDetail({ data, onBack }) {
                   <span className="text-gray-500">Asal</span>
                   <span className="col-span-2">{data.asal_sampel}</span>
                 </div>
-                {/* <div className="grid grid-cols-3">
-                  <span className="text-gray-500">Tgl Terima</span>
-                  <span className="col-span-2">
-                    {formatDate(data.tgl_terima)}
-                  </span>
-                </div> */}
                 <div className="grid grid-cols-3">
                   <span className="text-gray-500">Tgl & Jam Terima</span>
                   <span className="col-span-2">
