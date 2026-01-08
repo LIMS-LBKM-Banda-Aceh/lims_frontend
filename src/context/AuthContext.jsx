@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }) => {
 
       localStorage.setItem("token", token);
       setUser(user);
-      toast.success(`Selamat datang, ${user.username}!`);
+      toast.success(`Selamat datang, ${user.fullname}!`);
       return true;
     } catch (error) {
       toast.error(error.response?.data?.message || "Login gagal");

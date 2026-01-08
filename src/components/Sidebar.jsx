@@ -169,9 +169,6 @@ export default function Sidebar({
           })}
         </div>
 
-        {/* --- CUSTOMIZED USER PROFILE & LOGOUT SECTION --- */}
-        {/* PERUBAHAN 3: Hapus 'absolute bottom-0'. */}
-        {/* Tambahkan 'flex-none' agar footer tidak menyusut saat layar sangat pendek */}
         <div className="w-full p-4 border-t border-gray-50 bg-white flex-none">
           <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-gray-50 border border-gray-100 transition-all duration-200 hover:shadow-md hover:border-blue-100 group">
             {/* User Info Group */}
@@ -183,11 +180,11 @@ export default function Sidebar({
                     : "bg-linear-to-br from-cyan-100 to-blue-200 text-cyan-700"
                 }`}
               >
-                {user?.username?.charAt(0).toUpperCase()}
+                {user?.fullname?.charAt(0).toUpperCase()}
               </div>
               <div className="flex flex-col min-w-0">
                 <p className="text-sm font-bold text-gray-800 truncate leading-tight group-hover:text-primary transition-colors">
-                  {user?.username}
+                  {user?.fullname}
                 </p>
                 <div className="flex items-center gap-1">
                   <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide truncate">
