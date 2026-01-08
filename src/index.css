@@ -4,3 +4,17 @@
   --color-primary: #07B8A3; /* Contoh: Biru Royal */
   --color-hover: #058172
 }
+
+@media print {
+  /* Menyembunyikan semua notifikasi Toastify saat print */
+  .Toastify, 
+  .Toastify__toast-container {
+    display: none !important;
+  }
+
+  /* Opsional: Memastikan scrollbar browser tidak tercetak jika ada */
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

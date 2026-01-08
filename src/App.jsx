@@ -70,11 +70,6 @@ function App() {
             }
           />
 
-          {/* --- FIX 2: Hapus duplikasi path="/" yang lama --- */}
-          {/* Baris di bawah ini dihapus saja karena sudah ada LandingPage di atas */}
-          {/* <Route path="/" element={<Navigate to="/dashboard" replace />} /> */}
-
-          {/* Fallback jika halaman tidak ditemukan (404) -> Balik ke Home */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 

@@ -1,5 +1,13 @@
 // pages/RegistrationList.jsx
-import { Eye, Edit, Trash2, MoreHorizontal, Wallet } from "lucide-react";
+
+import {
+  Eye,
+  Edit,
+  Trash2,
+  MoreHorizontal,
+  Wallet,
+  FileText,
+} from "lucide-react"; // Tambah icon FileText
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import { toast } from "react-toastify";
@@ -18,6 +26,7 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
         month: "short",
       });
     } catch (e) {
+      console.error(e);
       return "-";
     }
   };
@@ -30,22 +39,14 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
     }).format(num || 0);
   };
 
-  // --- LOGIC HAPUS & REFRESH ---
   const handleDelete = async (id, noReg) => {
     if (!confirm(`Yakin ingin menghapus registrasi ${noReg}?`)) return;
 
     try {
       await api.delete(`/registrations/${id}`);
       toast.success("Registrasi berhasil dihapus");
-
-      // PENTING: Memanggil fungsi parent untuk ambil data ulang
-      if (onRefresh) {
-        onRefresh();
-      } else {
-        console.warn("onRefresh prop not passed to RegistrationList");
-      }
+      if (onRefresh) onRefresh();
     } catch (error) {
-      console.error(error);
       if (error.response?.status !== 200) {
         toast.error(
           error.response?.data?.message || "Gagal menghapus registrasi"
@@ -62,16 +63,17 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
     const styles = {
       selesai: "bg-green-100 text-green-700 border-green-200",
       terdaftar: "bg-blue-50 text-blue-700 border-blue-200",
-      proses: "bg-yellow-50 text-yellow-700 border-yellow-200",
-      tervalidasi: "bg-purple-50 text-purple-700 border-purple-200",
+      diterima_lab: "bg-indigo-50 text-indigo-700 border-indigo-200",
+      proses_lab: "bg-yellow-50 text-yellow-700 border-yellow-200",
+      selesai_uji: "bg-purple-50 text-purple-700 border-purple-200",
     };
     const style = styles[status] || "bg-gray-100 text-gray-600 border-gray-200";
 
     return (
       <span
-        className={`px-2.5 py-1 rounded-full text-[11px] uppercase font-bold tracking-wide border ${style}`}
+        className={`px-2.5 py-1 rounded-full text-[10px] uppercase font-bold tracking-wide border ${style}`}
       >
-        {status}
+        {status.replace("_", " ")}
       </span>
     );
   };
@@ -158,7 +160,7 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
                   </div>
                 </td>
 
-                {/* Pemeriksaan & Biaya */}
+                {/* Pemeriksaan & Biaya (UPDATED) */}
                 <td className="px-6 py-4">
                   <div
                     className="max-w-[200px] truncate text-sm text-gray-700 font-medium"
@@ -166,15 +168,29 @@ export default function RegistrationList({ data, onViewDetail, onRefresh }) {
                   >
                     {item.jenis_pemeriksaan}
                   </div>
-                  <div className="flex items-center gap-1.5 mt-1 text-cyan-700 font-bold text-xs">
-                    <Wallet size={12} />
-                    {formatRupiah(item.total_biaya)}
+
+                  <div className="flex items-center gap-2 mt-1">
+                    {item.status_pembayaran === "gratis" ? (
+                      <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wide border border-green-200">
+                        GRATIS / SUBSIDI
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-cyan-700 font-bold text-xs">
+                        <Wallet size={12} />
+                        {formatRupiah(item.total_biaya)}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">
-                    {/* Terima: {formatDateSafe(item.tgl_terima)} */}
-                    Terima: {formatDateSafe(item.tgl_terima)}{" "}
-                    <span className="text-gray-300">|</span>{" "}
-                    {item.waktu_sampling?.slice(0, 5) || "-"}
+
+                  <div className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
+                    <span>Terima: {formatDateSafe(item.tgl_terima)}</span>
+                    {item.catatan_tambahan && (
+                      <FileText
+                        size={10}
+                        className="text-orange-400 ml-1"
+                        title="Ada catatan tambahan"
+                      />
+                    )}
                   </div>
                 </td>
 

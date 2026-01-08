@@ -10,6 +10,9 @@ import {
   ShieldCheck,
   UserCog,
   Database,
+  FlaskConical,
+  FileBarChart,
+  Syringe,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -22,42 +25,71 @@ export default function Sidebar({
   const { user, logout } = useAuth();
 
   const handleLogout = () => {
-    if (confirm("Yakin ingin keluar dari aplikasi?")) {
-      logout();
-    }
+    if (confirm("Yakin ingin keluar?")) logout();
   };
 
-  // Base Menu
-  const menuItems = [
+  let menuItems = [
     { id: "overview", label: "Dashboard", icon: LayoutDashboard },
-    { id: "list", label: "Data Pasien", icon: FileText },
-    { id: "create", label: "Registrasi Baru", icon: PlusCircle },
   ];
 
-  // Menu Khusus Admin
-  // if (user?.role === "admin") {
-  //   menuItems.push({
-  //     id: "users",
-  //     label: "Manajemen User",
-  //     icon: UserCog,
-  //     isAdmin: true,
-  //   });
-  // }
+  // MENU BERDASARKAN ROLE
+  if (user?.role === "input" || user?.role === "admin") {
+    menuItems.push({
+      id: "create",
+      label: "Registrasi Baru",
+      icon: PlusCircle,
+    });
+    menuItems.push({
+      id: "list",
+      label: "Data Pasien",
+      icon: FileText,
+    });
+  }
+
+  if (user?.role === "sampler" || user?.role === "admin") {
+    menuItems.push({ id: "sampler", label: "Ambil Sampel", icon: Syringe });
+  }
+
+  if (user?.role === "lab" || user?.role === "admin") {
+    menuItems.push({
+      id: "lab-queue",
+      label: "Antrian Lab",
+      icon: FlaskConical,
+    });
+  }
+
+  if (
+    user?.role === "manajemen" ||
+    user?.role === "admin" ||
+    user?.role === "validator"
+  ) {
+    menuItems.push({
+      id: "management",
+      label: "Laporan & Data",
+      icon: FileBarChart,
+    });
+  }
 
   if (user?.role === "admin") {
-    // Tambahkan Menu Master Data sebelum User Management
     menuItems.push({
       id: "master",
-      label: "Master Pemeriksaan",
+      label: "Master Data",
       icon: Database,
       isAdmin: true,
     });
-
     menuItems.push({
       id: "users",
-      label: "Manajemen User",
+      label: "User Management",
       icon: UserCog,
       isAdmin: true,
+    });
+  }
+
+  if (user?.role === "kasir") {
+    menuItems.push({
+      id: "list",
+      label: "Data Pasien",
+      icon: FileText,
     });
   }
 
@@ -72,21 +104,25 @@ export default function Sidebar({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-100 shadow-xl shadow-blue-100/50 transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+        // PERUBAHAN 1: Tambahkan 'flex flex-col' agar layout menjadi vertikal fleksibel
+        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white border-r border-gray-100 shadow-xl shadow-blue-100/50 transform transition-transform duration-300 ease-in-out md:translate-x-0 flex flex-col ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Logo Header */}
-        <div className="h-20 flex items-center gap-3 px-6 border-b border-gray-50">
+        {/* Logo Header - (flex-none memastikan header tidak menyusut) */}
+        <div className="h-20 flex items-center gap-3 px-6 border-b border-gray-50 flex-none">
           <img
             src="/logo.svg"
             alt="Labkesmas Logo"
-            className="mx-auto h-12 w-auto mb-4 space-y-10"
+            className="mx-auto h-12 w-auto" // Hapus mb-4 space-y-10 agar rapi di dalam flex container
           />
         </div>
 
-        {/* Menu Items */}
-        <div className="p-4 space-y-2 mt-2">
+        {/* Menu Items Area */}
+        {/* PERUBAHAN 2: Tambahkan 'flex-1' dan 'overflow-y-auto' */}
+        {/* 'flex-1': Mengisi semua ruang sisa antara Header dan Footer */}
+        {/* 'overflow-y-auto': Memunculkan scrollbar HANYA di area menu jika terlalu panjang */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 mt-2 custom-scrollbar">
           <p className="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
             Menu Utama
           </p>
@@ -100,7 +136,7 @@ export default function Sidebar({
                   setView(item.id);
                   setIsMobileOpen(false);
                 }}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group ${
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group shrink-0 ${
                   isActive
                     ? "bg-cyan-50 text-cyan-700 shadow-sm"
                     : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
@@ -134,7 +170,9 @@ export default function Sidebar({
         </div>
 
         {/* --- CUSTOMIZED USER PROFILE & LOGOUT SECTION --- */}
-        <div className="absolute bottom-0 w-full p-4 border-t border-gray-50 bg-white">
+        {/* PERUBAHAN 3: Hapus 'absolute bottom-0'. */}
+        {/* Tambahkan 'flex-none' agar footer tidak menyusut saat layar sangat pendek */}
+        <div className="w-full p-4 border-t border-gray-50 bg-white flex-none">
           <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-gray-50 border border-gray-100 transition-all duration-200 hover:shadow-md hover:border-blue-100 group">
             {/* User Info Group */}
             <div className="flex items-center gap-3 overflow-hidden">

@@ -1,3 +1,4 @@
+// pages/RegistrationEdit.jsx
 import { useState, useEffect } from "react";
 import api from "../api/axios";
 import { toast } from "react-toastify";
@@ -6,13 +7,16 @@ import {
   ArrowLeft,
   Save,
   AlertCircle,
-  CheckCircle2,
   Search,
-  Clock, // [NEW] Tambahkan Clock icon
-  CalendarDays, // [NEW] Tambahkan CalendarDays
+  Clock,
+  CalendarDays,
+  FileText,
+  Building2,
+  Plus,
+  Minus,
 } from "lucide-react";
 
-// --- Form Components ---
+// --- Form Components (Tidak Berubah) ---
 const FormInput = ({
   label,
   type = "text",
@@ -22,12 +26,12 @@ const FormInput = ({
 }) => (
   <div className="space-y-1.5">
     <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-      {Icon && <Icon size={14} className="text-gray-500" />} {label}
+      {Icon && <Icon size={14} className="text-cyan-600" />} {label}
     </label>
     <input
       type={type}
       disabled={disabled}
-      className={`w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 transition-all outline-none text-sm text-gray-800 ${
+      className={`w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all outline-none text-sm text-gray-800 ${
         disabled ? "opacity-60 cursor-not-allowed bg-gray-100" : ""
       }`}
       {...props}
@@ -40,17 +44,20 @@ const FormSelect = ({ label, children, ...props }) => (
     <label className="text-sm font-semibold text-gray-700">{label}</label>
     <div className="relative">
       <select
-        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 transition-all outline-none text-sm appearance-none"
+        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all outline-none text-sm appearance-none"
         {...props}
       >
         {children}
       </select>
+      <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-gray-500">
+        ▼
+      </div>
     </div>
   </div>
 );
 
-// --- Component Selector ---
-const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
+// --- EXAMINATION SELECTOR DENGAN QUANTITY ---
+const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const groupedData = masterData.reduce((acc, item) => {
@@ -59,11 +66,40 @@ const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
     return acc;
   }, {});
 
-  const handleToggle = (id) => {
-    if (selectedIds.includes(id)) {
-      onChange(selectedIds.filter((sid) => sid !== id));
+  const getItemQty = (id) => {
+    const found = selectedItems.find((i) => Number(i.id) === Number(id));
+    return found ? found.qty : 0;
+  };
+
+  const handleAdd = (item) => {
+    const existing = selectedItems.find(
+      (i) => Number(i.id) === Number(item.id)
+    );
+    if (existing) {
+      onChange(
+        selectedItems.map((i) =>
+          Number(i.id) === Number(item.id) ? { ...i, qty: i.qty + 1 } : i
+        )
+      );
     } else {
-      onChange([...selectedIds, id]);
+      onChange([...selectedItems, { ...item, qty: 1 }]);
+    }
+  };
+
+  const handleRemove = (item) => {
+    const existing = selectedItems.find(
+      (i) => Number(i.id) === Number(item.id)
+    );
+    if (existing) {
+      if (existing.qty > 1) {
+        onChange(
+          selectedItems.map((i) =>
+            Number(i.id) === Number(item.id) ? { ...i, qty: i.qty - 1 } : i
+          )
+        );
+      } else {
+        onChange(selectedItems.filter((i) => Number(i.id) !== Number(item.id)));
+      }
     }
   };
 
@@ -85,7 +121,7 @@ const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
           <input
             type="text"
             placeholder="Cari pemeriksaan..."
-            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-yellow-200 text-sm"
+            className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-200 text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -101,33 +137,60 @@ const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
           if (filteredItems.length === 0) return null;
           return (
             <div key={category}>
-              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 sticky top-0 bg-white py-1">
+              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 sticky top-0 bg-white py-1 z-10">
                 {category}
               </h4>
               <div className="grid grid-cols-1 gap-2">
                 {filteredItems.map((item) => {
-                  const isSelected = selectedIds.includes(item.id);
+                  const qty = getItemQty(item.id);
+                  const isSelected = qty > 0;
                   return (
                     <div
                       key={item.id}
-                      onClick={() => handleToggle(item.id)}
-                      className={`cursor-pointer p-2.5 rounded-lg border transition-all flex justify-between items-center ${
+                      className={`p-2.5 rounded-lg border transition-all flex justify-between items-center ${
                         isSelected
-                          ? "bg-yellow-50 border-yellow-500 shadow-sm"
-                          : "bg-gray-50 border-gray-100 hover:border-yellow-300"
+                          ? "bg-cyan-50 border-cyan-500 shadow-sm"
+                          : "bg-gray-50 border-gray-100"
                       }`}
                     >
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">
+                      <div className="flex-1 min-w-0 pr-2">
+                        <p
+                          className="text-sm font-medium text-gray-800 truncate"
+                          title={item.nama_pemeriksaan}
+                        >
                           {item.nama_pemeriksaan}
                         </p>
                         <p className="text-[10px] text-gray-500">
                           {formatRupiah(item.harga)}
                         </p>
                       </div>
-                      {isSelected && (
-                        <CheckCircle2 size={16} className="text-yellow-600" />
-                      )}
+
+                      <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1">
+                        <button
+                          type="button"
+                          onClick={() => handleRemove(item)}
+                          disabled={!isSelected}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-gray-100 hover:bg-gray-200 text-gray-600 disabled:opacity-30 transition"
+                        >
+                          <Minus size={12} />
+                        </button>
+
+                        <span
+                          className={`text-xs font-bold w-4 text-center ${
+                            isSelected ? "text-cyan-700" : "text-gray-300"
+                          }`}
+                        >
+                          {qty}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAdd(item)}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-cyan-100 hover:bg-cyan-200 text-cyan-700 transition"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -149,12 +212,13 @@ export default function RegistrationEdit() {
 
   // State Master Data
   const [masterPemeriksaan, setMasterPemeriksaan] = useState([]);
-  const [selectedPemeriksaanIds, setSelectedPemeriksaanIds] = useState([]);
+
+  // State Items (Array Object)
+  const [selectedItems, setSelectedItems] = useState([]);
+
   const [totalBiaya, setTotalBiaya] = useState(0);
 
-  // [NEW] State untuk list item detail di footer
-  const [selectedItemsDetails, setSelectedItemsDetails] = useState([]);
-
+  // --- STATE FORM UTAMA ---
   const [form, setForm] = useState({
     nama_pasien: "",
     nik: "",
@@ -163,15 +227,16 @@ export default function RegistrationEdit() {
     jenis_kelamin: "L",
     alamat: "",
     no_kontak: "",
-    asal_sampel: "mandiri",
-    no_sampel_asal: "",
-    coding: "",
+    asal_sampel: "Mandiri",
+    status_pembayaran: "berbayar",
+    pengirim_instansi: "",
     tgl_terima: "",
-    waktu_sampling: "", // [NEW] Field waktu
+    waktu_sampling: "",
     tgl_pengambilan: "",
     no_reg: "",
     no_sampel_lab: "",
     petugas_input: "",
+    catatan_tambahan: "",
   });
 
   // Load Master Data & Detail Registrasi
@@ -181,7 +246,11 @@ export default function RegistrationEdit() {
       try {
         // 1. Load Master Data
         const masterRes = await api.get("/master/pemeriksaan");
-        if (masterRes.data.success) setMasterPemeriksaan(masterRes.data.data);
+        let masterList = [];
+        if (masterRes.data.success) {
+          masterList = masterRes.data.data;
+          setMasterPemeriksaan(masterList);
+        }
 
         // 2. Load Registration Data
         const res = await api.get(`/registrations/${id}`);
@@ -190,22 +259,56 @@ export default function RegistrationEdit() {
         const formatDate = (d) =>
           d ? new Date(d).toISOString().split("T")[0] : "";
 
+        // [FIX] Format Jam: Ambil hanya 5 karakter pertama (HH:mm)
+        // Format dari DB biasanya HH:mm:ss, kita ubah jadi HH:mm agar input type="time" bersih
+        const formatTime = (t) => (t && t.length >= 5 ? t.substring(0, 5) : "");
+
         setForm({
           ...data,
           tgl_lahir: formatDate(data.tgl_lahir),
           tgl_terima: formatDate(data.tgl_terima),
-          waktu_sampling: data.waktu_sampling || "", // [NEW] Load waktu
+          waktu_sampling: formatTime(data.waktu_sampling), // FIX DISINI
           tgl_pengambilan: formatDate(data.tgl_pengambilan),
+          catatan_tambahan: data.catatan_tambahan || "",
+          pengirim_instansi: data.pengirim_instansi || "",
+          status_pembayaran: data.status_pembayaran || "berbayar",
+          asal_sampel: data.asal_sampel || "Mandiri",
         });
 
-        // 3. Set Selected IDs
+        // 3. Transform Details ke Selected Items
         if (data.details && Array.isArray(data.details)) {
-          setSelectedPemeriksaanIds(data.details.map((d) => d.pemeriksaan_id));
+          const grouped = {};
+
+          data.details.forEach((detail) => {
+            const pid = detail.pemeriksaan_id;
+
+            if (!grouped[pid]) {
+              const masterItem = masterList.find((m) => m.id === pid);
+              grouped[pid] = {
+                id: pid,
+                qty: 0,
+                nama_pemeriksaan: masterItem
+                  ? masterItem.nama_pemeriksaan
+                  : detail.nama_pemeriksaan,
+                harga: Number(detail.harga_saat_ini),
+              };
+            }
+            grouped[pid].qty += 1;
+          });
+
+          setSelectedItems(Object.values(grouped));
         } else if (data.pemeriksaan_ids) {
-          setSelectedPemeriksaanIds(data.pemeriksaan_ids);
+          const items = data.pemeriksaan_ids
+            .map((id) => {
+              const master = masterList.find((m) => m.id === Number(id));
+              return master ? { ...master, qty: 1 } : null;
+            })
+            .filter(Boolean);
+          setSelectedItems(items);
         }
       } catch (err) {
-        toast.error("Gagal memuat data");
+        console.error(err);
+        toast.error("Gagal memuat data registrasi");
         navigate("/dashboard");
       } finally {
         setLoading(false);
@@ -214,38 +317,42 @@ export default function RegistrationEdit() {
     initData();
   }, [id, navigate]);
 
-  // Hitung ulang total biaya realtime & Update Details
+  // Kalkulasi Biaya
   useEffect(() => {
-    const selectedItems = masterPemeriksaan.filter((item) =>
-      selectedPemeriksaanIds.includes(item.id)
-    );
-
-    // Update display items
-    setSelectedItemsDetails(selectedItems);
-
-    const total = selectedItems.reduce(
-      (sum, item) => sum + Number(item.harga),
-      0
-    );
-    setTotalBiaya(total);
-  }, [selectedPemeriksaanIds, masterPemeriksaan]);
+    if (form.status_pembayaran === "gratis") {
+      setTotalBiaya(0);
+    } else {
+      const total = selectedItems.reduce(
+        (sum, item) => sum + Number(item.harga) * item.qty,
+        0
+      );
+      setTotalBiaya(total);
+    }
+  }, [selectedItems, form.status_pembayaran]);
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
 
-  // [NEW] Auto Age Calculator juga perlu di Edit jika tgl lahir diubah
+  const handleAsalSampelChange = (e) => {
+    const val = e.target.value;
+    const newStatus = val === "Mandiri" ? "berbayar" : "berbayar";
+    setForm((prev) => ({
+      ...prev,
+      asal_sampel: val,
+      status_pembayaran: newStatus,
+    }));
+  };
+
+  // Auto Age
   useEffect(() => {
     if (form.tgl_lahir) {
       const today = new Date();
       const birthDate = new Date(form.tgl_lahir);
-
       let age = today.getFullYear() - birthDate.getFullYear();
       const m = today.getMonth() - birthDate.getMonth();
-
       if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
         age--;
       }
-      // Hanya update umur jika user mengubah tgl lahir (opsional, tapi bagus untuk konsistensi)
       setForm((prev) => ({ ...prev, umur: age < 0 ? 0 : age }));
     }
   }, [form.tgl_lahir]);
@@ -262,12 +369,13 @@ export default function RegistrationEdit() {
       updated_at,
       jenis_pemeriksaan,
       total_biaya,
+      details,
       ...cleanForm
     } = form;
 
     const payload = {
       ...cleanForm,
-      pemeriksaan_ids: selectedPemeriksaanIds,
+      items: selectedItems.map((item) => ({ id: item.id, qty: item.qty })),
     };
 
     Object.keys(payload).forEach((k) => {
@@ -276,10 +384,11 @@ export default function RegistrationEdit() {
 
     try {
       await api.put(`/registrations/${id}`, payload);
-      toast.success("Perubahan disimpan");
+      toast.success("Perubahan berhasil disimpan");
       navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "Gagal menyimpan");
+      console.error(err);
+      setError(err.response?.data?.message || "Gagal menyimpan perubahan");
       toast.error("Gagal menyimpan");
     } finally {
       setSaving(false);
@@ -295,7 +404,6 @@ export default function RegistrationEdit() {
   return (
     <div className="min-h-screen bg-gray-50 font-sans pb-20">
       <div className="max-w-6xl mx-auto py-10 px-6">
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <button
             onClick={() => navigate("/dashboard")}
@@ -317,11 +425,10 @@ export default function RegistrationEdit() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
-          {/* Read Only Header */}
-          <div className="bg-yellow-50 border-b border-yellow-100 p-6 flex flex-col md:flex-row gap-6 justify-between items-center">
+          <div className="bg-cyan-50 border-b border-cyan-100 p-6 flex flex-col md:flex-row gap-6 justify-between items-center">
             <div className="flex gap-8">
               <div>
-                <p className="text-xs font-bold text-yellow-700 uppercase">
+                <p className="text-xs font-bold text-cyan-700 uppercase">
                   No. Registrasi
                 </p>
                 <p className="text-lg font-mono font-bold text-gray-800">
@@ -329,7 +436,7 @@ export default function RegistrationEdit() {
                 </p>
               </div>
               <div>
-                <p className="text-xs font-bold text-yellow-700 uppercase">
+                <p className="text-xs font-bold text-cyan-700 uppercase">
                   Sampel Lab
                 </p>
                 <p className="text-lg font-mono font-bold text-gray-800">
@@ -348,7 +455,6 @@ export default function RegistrationEdit() {
 
           <form onSubmit={handleSubmit} className="flex flex-col h-full">
             <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* KOLOM KIRI: Form Pasien */}
               <div className="lg:col-span-2 space-y-6">
                 <div>
                   <h3 className="font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100">
@@ -406,7 +512,7 @@ export default function RegistrationEdit() {
                         name="alamat"
                         value={form.alamat}
                         onChange={handleChange}
-                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 h-20 focus:ring-2 focus:ring-yellow-200 outline-none text-sm mt-1"
+                        className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 h-20 focus:ring-2 focus:ring-cyan-200 outline-none text-sm mt-1"
                       ></textarea>
                     </div>
                   </div>
@@ -414,23 +520,46 @@ export default function RegistrationEdit() {
 
                 <div>
                   <h3 className="font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100">
-                    Info Sampel
+                    Info Sampel & Admin
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormInput
+                    <FormSelect
                       label="Asal Sampel"
                       name="asal_sampel"
                       value={form.asal_sampel}
-                      onChange={handleChange}
-                    />
+                      onChange={handleAsalSampelChange}
+                    >
+                      <option value="Mandiri">Mandiri (Umum)</option>
+                      <option value="Rujukan">Rujukan (Faskes/RS)</option>
+                    </FormSelect>
+
+                    {form.asal_sampel === "Rujukan" ? (
+                      <FormSelect
+                        label="Status Pembayaran"
+                        name="status_pembayaran"
+                        value={form.status_pembayaran}
+                        onChange={handleChange}
+                      >
+                        <option value="berbayar">Berbayar</option>
+                        <option value="gratis">Tidak Berbayar / Program</option>
+                      </FormSelect>
+                    ) : (
+                      <FormInput
+                        label="Status Pembayaran"
+                        value="BERBAYAR (MANDIRI)"
+                        disabled
+                      />
+                    )}
+
                     <FormInput
-                      label="No. Sampel Asal"
-                      name="no_sampel_asal"
-                      value={form.no_sampel_asal}
+                      label="Pengirim / Instansi"
+                      name="pengirim_instansi"
+                      value={form.pengirim_instansi}
                       onChange={handleChange}
+                      placeholder="Nama Dokter / RS / Klinik"
+                      icon={Building2}
                     />
 
-                    {/* [NEW] Baris Tanggal dan Jam Terima */}
                     <FormInput
                       label="Tgl Terima"
                       type="date"
@@ -447,63 +576,76 @@ export default function RegistrationEdit() {
                       onChange={handleChange}
                       icon={Clock}
                     />
+                  </div>
 
+                  <div className="mt-4">
                     <FormInput
-                      label="Coding"
-                      name="coding"
-                      value={form.coding}
+                      label="Catatan Tambahan"
+                      name="catatan_tambahan"
+                      value={form.catatan_tambahan}
                       onChange={handleChange}
+                      icon={FileText}
                     />
                   </div>
                 </div>
               </div>
 
-              {/* KOLOM KANAN: Selector Pemeriksaan */}
               <div className="lg:col-span-1 h-full flex flex-col">
                 <h3 className="font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100">
                   Item Pemeriksaan
                 </h3>
                 <ExaminationSelector
                   masterData={masterPemeriksaan}
-                  selectedIds={selectedPemeriksaanIds}
-                  onChange={setSelectedPemeriksaanIds}
+                  selectedItems={selectedItems}
+                  onChange={setSelectedItems}
                 />
               </div>
             </div>
 
-            {/* ACTION BAR (FOOTER) */}
             <div className="mt-auto bg-gray-50 border-t border-gray-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              {/* Bagian Kiri: Total Harga & Summary Items */}
               <div className="flex items-start gap-4 flex-1">
-                <div className="bg-yellow-100 p-3 rounded-xl text-yellow-700 shrink-0">
+                <div className="bg-cyan-100 p-3 rounded-xl text-cyan-700 shrink-0">
                   <span className="font-bold text-xl">Rp</span>
                 </div>
 
                 <div className="flex flex-col w-full max-w-sm">
-                  <div>
-                    <p className="text-sm text-gray-500 font-medium">
-                      Total Estimasi Biaya
-                    </p>
-                    <p className="text-2xl font-bold text-gray-800">
-                      {formatRupiah(totalBiaya)}
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <div>
+                      <p className="text-sm text-gray-500 font-medium">
+                        Total Estimasi Biaya
+                      </p>
+                      <p className="text-2xl font-bold text-gray-800">
+                        {formatRupiah(totalBiaya)}
+                      </p>
+                    </div>
+                    {totalBiaya === 0 &&
+                      form.status_pembayaran === "gratis" && (
+                        <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-lg font-bold border border-green-200">
+                          GRATIS / SUBSIDI
+                        </span>
+                      )}
                   </div>
 
-                  {/* [NEW] LIST ITEM TERPILIH DI FOOTER */}
-                  {selectedItemsDetails.length > 0 && (
-                    <div className="mt-2 text-xs text-gray-600 max-h-20 overflow-y-auto custom-scrollbar border-l-2 border-yellow-300 pl-2">
-                      {selectedItemsDetails.map((item, idx) => (
-                        <span key={item.id}>
-                          {item.nama_pemeriksaan}
-                          {idx < selectedItemsDetails.length - 1 ? ", " : ""}
-                        </span>
+                  {selectedItems.length > 0 && (
+                    <div className="mt-2 text-xs text-gray-600 max-h-20 overflow-y-auto custom-scrollbar border-l-2 border-cyan-300 pl-2">
+                      {selectedItems.map((item, idx) => (
+                        <div
+                          key={item.id}
+                          className="flex justify-between items-center mb-1"
+                        >
+                          <span className="truncate w-2/3">
+                            {item.nama_pemeriksaan}
+                          </span>
+                          <span className="font-bold bg-white px-1.5 border border-cyan-200 rounded text-cyan-700">
+                            x{item.qty}
+                          </span>
+                        </div>
                       ))}
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Bagian Kanan: Tombol Aksi */}
               <div className="flex items-center gap-3 w-full md:w-auto shrink-0">
                 <button
                   type="button"
@@ -515,7 +657,7 @@ export default function RegistrationEdit() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 md:flex-none px-8 py-3 rounded-xl bg-yellow-500 text-white font-bold hover:bg-yellow-600 shadow-lg shadow-yellow-200 hover:shadow-yellow-300 transition flex items-center justify-center gap-2"
+                  className="flex-1 md:flex-none px-8 py-3 rounded-xl bg-linear-to-r from-cyan-600 to-blue-600 text-white font-bold hover:shadow-lg hover:shadow-cyan-200 transition flex items-center justify-center gap-2"
                 >
                   {saving ? (
                     "Menyimpan..."
