@@ -11,6 +11,7 @@ import {
   FlaskConical,
   PackageCheck,
   PlusCircle,
+  Syringe
 } from "lucide-react";
 
 // Components
@@ -40,7 +41,7 @@ const StatCard = ({ title, value, icon: Icon, color, subtext }) => (
 const DashboardOverview = ({ data, stats, onChangeView, onRefresh }) => {
   return (
     <div className="space-y-8 animate-fade-in">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Registrasi"
           value={stats?.total || 0}
@@ -60,8 +61,8 @@ const DashboardOverview = ({ data, stats, onChangeView, onRefresh }) => {
           value={
             Number(stats?.waiting_queue || 0) + Number(stats?.in_sampling || 0)
           }
-          icon={Clock}
-          color="bg-gray-500"
+          icon={Syringe}
+          color="bg-red-500"
           subtext={`${stats?.in_sampling || 0} sedang diambil`}
         />
         <StatCard
@@ -198,7 +199,7 @@ export default function Dashboard() {
           </div>
           <div className="text-right">
             <span className="block text-sm font-bold text-gray-700">
-              {user?.username}
+              {user?.fullname}
             </span>
             <span className="text-[10px] text-cyan-600 uppercase font-bold tracking-widest">
               {user?.role}

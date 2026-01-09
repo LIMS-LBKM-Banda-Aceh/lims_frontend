@@ -1,16 +1,51 @@
-import React from "react";
+// pages/RegistrationDetail.jsx
+
+import React, { useState, useEffect } from "react";
+import api from "../api/axios";
+import { toast } from "react-toastify";
+import { useAuth } from "../context/AuthContext";
+
 import {
   ArrowLeft,
   Printer,
   User,
   Activity,
-  TestTube2,
   CreditCard,
-  Building2,
+  Save,
+  Edit2,
 } from "lucide-react";
 
 export default function RegistrationDetail({ data, onBack }) {
+  const [isEditingNo, setIsEditingNo] = useState(false);
+  const [invoiceNo, setInvoiceNo] = useState("");
+  const [loadingSave, setLoadingSave] = useState(false);
+  const { user: currentUser } = useAuth();
+
+  // Set default template jika no_invoice masih kosong
+  useEffect(() => {
+    if (data) {
+      const year = new Date().getFullYear();
+      setInvoiceNo(data.no_invoice || ` / 690798 / PNBP / ${year}`);
+    }
+  }, [data]);
+
   if (!data) return null;
+
+  const handleSaveInvoice = async () => {
+    setLoadingSave(true);
+    try {
+      await api.put(`/registrations/${data.id}`, { no_invoice: invoiceNo });
+      toast.success("Nomor Invoice diperbarui");
+      setIsEditingNo(false);
+      // Update data lokal agar tampilan sinkron
+      data.no_invoice = invoiceNo;
+    } catch (error) {
+      console.error("Gagal memperbarui nomor:", error);
+      toast.error("Gagal menyimpan nomor");
+    } finally {
+      setLoadingSave(false);
+    }
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return "-";
@@ -117,8 +152,8 @@ export default function RegistrationDetail({ data, onBack }) {
 
   return (
     <div className="space-y-6 animate-fade-in print:fixed print:inset-0 print:z-[9999] print:bg-white print:p-8 print:m-0 print:h-screen print:overflow-auto">
-      {/* Tombol Navigasi (Hilang saat Print) */}
-      <div className="flex items-center justify-between print:hidden">
+      {/* HEADER ACTIONS */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition font-medium"
@@ -128,14 +163,55 @@ export default function RegistrationDetail({ data, onBack }) {
           </div>
           Kembali ke List
         </button>
-        <button
-          onClick={() => globalThis.print()}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition shadow-lg shadow-gray-200"
-        >
-          <Printer size={18} /> Cetak Bukti Registrasi
-        </button>
+
+        <div className="flex gap-2">
+          {/* INPUT NOMOR INVOICE UNTUK KASIR/ADMIN */}
+          <div className="flex items-center bg-white border border-gray-200 rounded-xl px-3 py-1 shadow-sm">
+            <span className="text-xs font-bold text-gray-400 mr-2 uppercase">
+              No Invoice:
+            </span>
+            {isEditingNo ? (
+              <div className="flex gap-1">
+                <input
+                  type="text"
+                  className="border-b border-cyan-500 outline-none text-sm font-bold w-48 px-1"
+                  value={invoiceNo}
+                  onChange={(e) => setInvoiceNo(e.target.value)}
+                  autoFocus
+                />
+                <button
+                  onClick={handleSaveInvoice}
+                  disabled={loadingSave}
+                  className="text-green-600 p-1 hover:bg-green-50 rounded"
+                >
+                  {loadingSave ? "..." : <Save size={16} />}
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-gray-700">
+                  {invoiceNo || "-"}
+                </span>
+                <button
+                  onClick={() => setIsEditingNo(true)}
+                  className="text-cyan-600 p-1 hover:bg-cyan-50 rounded"
+                >
+                  <Edit2 size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => globalThis.print()}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition shadow-lg"
+          >
+            <Printer size={18} /> Cetak Bukti
+          </button>
+        </div>
       </div>
 
+      {/* --- KOP SURAT (PRINT VIEW) --- */}
       {/* KOP SURAT (Hanya Print) */}
       <div className="hidden print:flex justify-between items-center border-b-2 border-black pb-4 mb-6">
         <img
@@ -148,57 +224,37 @@ export default function RegistrationDetail({ data, onBack }) {
         />
       </div>
 
-      {/* Judul Print */}
+      {/* JUDUL PRINT DENGAN NOMOR INVOICE */}
       <div className="hidden print:block text-center mb-6">
-        <h3 className="text-lg font-bold text-black underline decoration-2 underline-offset-4">
-          INVOICE/BUKTI REGISTRASI SAMPEL
+        <h3 className="text-lg font-extrabold text-black underline-offset-4">
+          INVOICE LAYANAN PNBP 
           <br />
           BALAI LABORATORIUM KESEHATAN MASYARAKAT BANDA ACEH
         </h3>
-        <p className="text-xs text-gray-500 mt-1">
-          Dicetak pada:{" "}
-          {new Date().toLocaleDateString("id-ID", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
+        <p className="text-sm font-bold mt-1">Nomor : {invoiceNo}</p>
       </div>
 
-      {/* Main Content */}
+      {/* --- MAIN CARD --- */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden print:shadow-none print:border-0 print:rounded-none">
-        {/* Header Warna */}
-        <div className="bg-linear-to-r from-cyan-600 to-blue-600 p-8 text-white print:bg-none print:p-0 print:text-black print:mb-4 print:border-b print:border-dashed print:pb-4">
+        <div className="bg-linear-to-r from-cyan-600 to-blue-600 p-8 text-white print:text-black print:bg-none print:p-0 print:border-b print:pb-4 print:mb-4">
+          {/* Tampilkan juga No Invoice di Header Biru (Non-Print) */}
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-cyan-100 text-sm font-medium mb-1 print:text-gray-500 print:text-xs print:uppercase">
-                Nomor Registrasi
+              <p className="text-cyan-100 text-xs font-bold uppercase mb-1 print:text-gray-400">
+                Nomor Registrasi Sistem
               </p>
-              <h1 className="text-3xl font-bold tracking-tight print:text-xl print:font-mono">
+              <h1 className="text-3xl font-bold print:text-lg">
                 {data.no_reg}
               </h1>
-              <div className="flex flex-col gap-1 mt-2 text-cyan-50 print:text-gray-700 print:mt-1">
-                <div className="flex items-center gap-2">
-                  <TestTube2 size={16} className="print:hidden" />
-                  <span className="font-mono text-sm opacity-90">
-                    ID Lab: {data.no_sampel_lab}
-                  </span>
-                </div>
-                {data.no_sampel_asal && (
-                  <div className="flex items-center gap-2">
-                    <Building2 size={16} className="print:hidden" />
-                    <span className="font-mono text-sm opacity-90">
-                      Ref / Asal: {data.no_sampel_asal}
-                    </span>
-                  </div>
-                )}
-              </div>
+              {!isEditingNo && invoiceNo && (
+                <p className="mt-2 text-cyan-200 text-sm font-mono flex items-center gap-2 print:text-black print:text-xs">
+                  <CreditCard size={14} /> Invoice: {invoiceNo}
+                </p>
+              )}
             </div>
-            <div className="bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/30 print:border-2 print:border-black print:bg-transparent print:rounded-md">
-              <span className="font-bold uppercase tracking-wide text-sm print:text-black">
-                {data.status.replace("_", " ")}
-              </span>
+            {/* Status Badge */}
+            <div className="bg-white/20 px-4 py-1.5 rounded-full border border-white/30 print:border-black print:text-black">
+              <span className="font-bold text-sm uppercase">{data.status}</span>
             </div>
           </div>
         </div>
@@ -317,10 +373,22 @@ export default function RegistrationDetail({ data, onBack }) {
                 ({data.nama_pasien || ".........................."})
               </p>
             </div>
-            <div>
-              <p className="mb-12">Petugas Administrasi</p>
+            <div className="text-center">
+              <p>
+                Aceh Besar,{" "}
+                {new Date().toLocaleDateString("id-ID", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+              </p>
+              <p className="mb-12">Pengelola PNBP</p>
               <p className="font-bold underline">
-                ({data.petugas_input || "Admin Labkesmas"})
+                (
+                {currentUser?.fullname ||
+                  currentUser?.username ||
+                  "Admin Labkesmas"}
+                )
               </p>
             </div>
           </div>

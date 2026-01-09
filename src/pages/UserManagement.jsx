@@ -26,6 +26,7 @@ export default function UserManagement() {
   const [formData, setFormData] = useState({
     id: null,
     username: "",
+    fullname: "",
     password: "",
     role: "input",
   });
@@ -58,6 +59,7 @@ export default function UserManagement() {
     setFormData({
       id: user.id,
       username: user.username,
+      fullname: user.fullname || "",
       password: "",
       role: user.role,
     });
@@ -84,6 +86,7 @@ export default function UserManagement() {
       if (isEditing) {
         const payload = {
           username: formData.username,
+          fullname: formData.fullname,
           role: formData.role,
         };
         if (formData.password) payload.password = formData.password;
@@ -205,12 +208,19 @@ export default function UserManagement() {
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-linear-to-br from-gray-100 to-gray-200 flex items-center justify-center text-gray-600 font-bold border border-gray-200">
-                          {item.username.charAt(0).toUpperCase()}
+                        <div className="w-9 h-9 rounded-full bg-linear-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-sm">
+                          {(item.fullname || item.username)
+                            .charAt(0)
+                            .toUpperCase()}
                         </div>
-                        <span className="font-semibold text-gray-800">
-                          {item.username}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-gray-800">
+                            {item.fullname || "No Name"}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            @{item.username}
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -281,7 +291,22 @@ export default function UserManagement() {
                 />
               </div>
 
-              {/* ----- PERBAIKAN UTAMA DISINI: MENAMBAHKAN OPSI ROLE YANG HILANG ----- */}
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <User size={16} className="text-cyan-600" /> Nama Lengkap
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all text-sm"
+                  value={formData.fullname}
+                  onChange={(e) =>
+                    setFormData({ ...formData, fullname: e.target.value })
+                  }
+                  placeholder="Contoh: Dr. Budi Santoso"
+                />
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                   <Shield size={16} className="text-cyan-600" /> Role / Akses
@@ -294,7 +319,7 @@ export default function UserManagement() {
                   }
                 >
                   <option value="input">Input (Pendaftaran)</option>
-                  <option value="kasir">Kasir (Pembiayaan)</option>
+                  <option value="kasir">Kasir (Pendaftaran)</option>
                   <option value="sampler">Sampler (Pengambil Sampel)</option>
                   <option value="lab">Lab (Petugas Lab / Analis)</option>
                   <option value="validator">
