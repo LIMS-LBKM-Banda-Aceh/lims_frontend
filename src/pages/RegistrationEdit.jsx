@@ -230,8 +230,8 @@ export default function RegistrationEdit() {
     asal_sampel: "Mandiri",
     status_pembayaran: "berbayar",
     pengirim_instansi: "",
-    tgl_terima: "",
-    waktu_sampling: "",
+    tgl_daftar: "",
+    waktu_daftar: "",
     tgl_pengambilan: "",
     no_reg: "",
     no_sampel_lab: "",
@@ -266,8 +266,8 @@ export default function RegistrationEdit() {
         setForm({
           ...data,
           tgl_lahir: formatDate(data.tgl_lahir),
-          tgl_terima: formatDate(data.tgl_terima),
-          waktu_sampling: formatTime(data.waktu_sampling), // FIX DISINI
+          tgl_daftar: formatDate(data.tgl_daftar),
+          waktu_daftar: formatTime(data.waktu_daftar), // FIX DISINI
           tgl_pengambilan: formatDate(data.tgl_pengambilan),
           catatan_tambahan: data.catatan_tambahan || "",
           pengirim_instansi: data.pengirim_instansi || "",
@@ -561,18 +561,18 @@ export default function RegistrationEdit() {
                     />
 
                     <FormInput
-                      label="Tgl Terima"
+                      label="Tgl Daftar"
                       type="date"
-                      name="tgl_terima"
-                      value={form.tgl_terima}
+                      name="tgl_daftar"
+                      value={form.tgl_daftar}
                       onChange={handleChange}
                       icon={CalendarDays}
                     />
                     <FormInput
-                      label="Jam Terima"
+                      label="Jam Daftar"
                       type="time"
-                      name="waktu_sampling"
-                      value={form.waktu_sampling}
+                      name="waktu_daftar"
+                      value={form.waktu_daftar}
                       onChange={handleChange}
                       icon={Clock}
                     />

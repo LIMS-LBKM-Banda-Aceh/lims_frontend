@@ -10,8 +10,8 @@ import {
   CheckCircle2,
   FileText,
   Calendar,
-  X, // Icon Close
-  Eye, // Icon Preview
+  X, 
+  Eye,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "react-toastify";
@@ -113,8 +113,8 @@ export default function DataManagement({ onRefreshStats }) {
     const dataToExport = filteredData.map((item) => ({
       "No. Registrasi": item.no_reg,
       "No. Sampel Lab": item.no_sampel_lab,
-      "Tanggal Terima": new Date(item.tgl_terima).toLocaleDateString("id-ID"),
-      "Jam Terima": item.waktu_sampling,
+      "Tanggal Daftar": new Date(item.tgl_daftar).toLocaleDateString("id-ID"),
+      "Waktu Daftar": item.waktu_daftar,
       "Nama Pasien": item.nama_pasien,
       NIK: item.nik,
       "Jenis Kelamin": item.jenis_kelamin,

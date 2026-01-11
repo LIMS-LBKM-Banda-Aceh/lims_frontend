@@ -160,10 +160,10 @@ export default function LabQueue({ onRefreshStats }) {
                     <div className="flex flex-col gap-0.5">
                       <div className="flex items-center gap-1 font-medium text-gray-700">
                         <Clock size={14} className="text-cyan-600" />{" "}
-                        {item.waktu_sampling?.slice(0, 5) || "00:00"} WIB
+                        {item.waktu_daftar?.slice(0, 5) || "00:00"} WIB
                       </div>
                       <div className="text-[10px] text-gray-400 capitalize">
-                        {new Date(item.tgl_terima).toLocaleDateString("id-ID", {
+                        {new Date(item.tgl_daftar).toLocaleDateString("id-ID", {
                           weekday: "short",
                           day: "numeric",
                           month: "short",

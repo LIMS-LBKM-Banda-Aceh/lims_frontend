@@ -232,8 +232,8 @@ export default function RegistrationForm({ onSuccess }) {
     asal_sampel: "Mandiri",
     status_pembayaran: "berbayar",
     pengirim_instansi: "",
-    tgl_terima: new Date().toISOString().split("T")[0],
-    waktu_sampling: new Date().toLocaleTimeString("it-IT", {
+    tgl_daftar: new Date().toISOString().split("T")[0],
+    waktu_daftar: new Date().toLocaleTimeString("it-IT", {
       hour: "2-digit",
       minute: "2-digit",
     }),
@@ -317,7 +317,7 @@ export default function RegistrationForm({ onSuccess }) {
         ...form,
         nama_pasien: "",
         nik: "",
-        waktu_sampling: new Date().toLocaleTimeString("it-IT", {
+        waktu_daftar: new Date().toLocaleTimeString("it-IT", {
           hour: "2-digit",
           minute: "2-digit",
         }),
@@ -528,19 +528,19 @@ export default function RegistrationForm({ onSuccess }) {
               />
               <div className="grid grid-cols-2 gap-3">
                 <FormInput
-                  label="Tgl Terima"
+                  label="Tgl Daftar"
                   type="date"
-                  name="tgl_terima"
-                  value={form.tgl_terima}
+                  name="tgl_daftar"
+                  value={form.tgl_daftar}
                   onChange={handleChange}
                   icon={CalendarDays}
                 />
 
                 <FormInput
-                  label="Jam Terima"
+                  label="Jam Daftar"
                   type="time"
-                  name="waktu_sampling"
-                  value={form.waktu_sampling}
+                  name="waktu_daftar"
+                  value={form.waktu_daftar}
                   onChange={handleChange}
                   icon={Clock}
                 />

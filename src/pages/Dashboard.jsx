@@ -11,7 +11,7 @@ import {
   FlaskConical,
   PackageCheck,
   PlusCircle,
-  Syringe
+  Syringe,
 } from "lucide-react";
 
 // Components
@@ -58,12 +58,10 @@ const DashboardOverview = ({ data, stats, onChangeView, onRefresh }) => {
         />
         <StatCard
           title="Antrian Sampel"
-          value={
-            Number(stats?.waiting_queue || 0) + Number(stats?.in_sampling || 0)
-          }
+          value={stats?.in_sampling || 0}
           icon={Syringe}
           color="bg-red-500"
-          subtext={`${stats?.in_sampling || 0} sedang diambil`}
+          subtext="Sedang diambil"
         />
         <StatCard
           title="Diterima Lab"
@@ -139,13 +137,15 @@ export default function Dashboard() {
         const d = resStats.data.data;
         const mappedStats = {
           total: Number(d.total || 0),
-          waiting_queue: Number(d.waiting_queue || 0), // Pastikan ini Number
-          in_sampling: Number(d.in_sampling || 0), // Pastikan ini Number
-          diterima_lab: Number(d.waiting_process || 0),
+
+          terdaftar: Number(d.waiting_queue || 0),
+          in_sampling: Number(d.in_sampling || 0),
+          diterima_lab: Number(d.diterima_lab || 0),
           proses_lab: Number(d.in_testing || 0),
           selesai_uji: Number(d.waiting_validation || 0),
           selesai: Number(d.completed || 0),
         };
+
         setStats(mappedStats);
       }
     } catch (error) {
@@ -159,11 +159,34 @@ export default function Dashboard() {
     fetchMainData();
   }, [fetchMainData]);
 
-  const handleChangeView = (newView, item = null) => {
-    if (item) setSelectedRegistration(item);
+  // Ganti fungsi handleChangeView di Dashboard.jsx Anda dengan ini:
+
+  const handleChangeView = useCallback(async (newView, item = null) => {
+    if (newView === "detail" && item) {
+      try {
+        // WAJIB: Ambil data lengkap dari server berdasarkan ID
+        // agar array 'details' yang di-JOIN di backend ikut terbawa
+        const res = await api.get(`/registrations/${item.id}`);
+
+        if (res.data.success) {
+          setSelectedRegistration(res.data.data);
+        } else {
+          // Fallback jika gagal
+          setSelectedRegistration(item);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil rincian pasien:", error);
+        setSelectedRegistration(item);
+      }
+    } else if (item) {
+      setSelectedRegistration(item);
+    } else {
+      setSelectedRegistration(null);
+    }
+
     setView(newView);
     setIsMobileOpen(false);
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex font-sans">

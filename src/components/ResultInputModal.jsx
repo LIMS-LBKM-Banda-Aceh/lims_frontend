@@ -33,55 +33,58 @@ export default function ResultInputModal({
     fetchTests();
   }, [registrationId]);
 
-  const handleUpdate = async (testId, value) => {
-    try {
-      setSaving(true);
-      await api.put(`/tests/${testId}/result`, { nilai: value });
-
-      // Update local state
-      setTests((prev) =>
-        prev.map((t) =>
-          t.id === testId ? { ...t, nilai: value, status: "completed" } : t
-        )
-      );
-
-      toast.success("Hasil berhasil disimpan");
-    } catch (e) {
-      console.error("Error updating test:", e);
-      if (e.response?.status === 403) {
-        toast.error("Tidak memiliki izin untuk mengupdate hasil");
-      } else {
-        toast.error("Gagal menyimpan hasil");
-      }
-    } finally {
-      setSaving(false);
-    }
+  // Handler untuk mengubah state lokal saja (TANPA request API otomatis)
+  const handleInputChange = (testId, value) => {
+    setTests((prev) =>
+      prev.map((t) => (t.id === testId ? { ...t, nilai: value } : t))
+    );
   };
 
-  // ResultInputModal.jsx - Perbaiki handleSaveAll
+  // Logic BARU: Simpan semua data sekaligus saat tombol ditekan
   const handleSaveAll = async () => {
     try {
       setSaving(true);
-      const allFilled = tests.every((t) => t.nilai && t.nilai.trim() !== "");
 
-      if (!allFilled) {
-        toast.warning("Harap isi semua hasil");
+      // 1. Validasi sederhana: Pastikan minimal ada satu yang diisi atau validasi sesuai kebutuhan
+      const hasValue = tests.some(
+        (t) => t.nilai && t.nilai.toString().trim() !== ""
+      );
+      if (!hasValue) {
+        toast.warning("Belum ada hasil yang diinput.");
+        setSaving(false);
         return;
       }
 
-      // Pastikan Backend memproses sinkronisasi status ke 'selesai_uji'
-      toast.success("Hasil laboratorium lengkap!");
-      onClose(); // Ini akan memicu refresh di halaman LabQueue jika dipasang dengan benar
+      // 2. Buat array of promises untuk request API secara paralel
+      // Kita hanya mengirim data yang memiliki nilai agar efisien (opsional, bisa juga kirim semua)
+      const savePromises = tests.map((test) => {
+        // Jika nilai kosong, mungkin kita skip atau tetap kirim string kosong tergantung logic backend
+        // Di sini saya asumsikan kita kirim update untuk semua row yang ada di modal
+        return api.put(`/tests/${test.id}/result`, { nilai: test.nilai || "" });
+      });
+
+      // 3. Jalankan semua request
+      await Promise.all(savePromises);
+
+      // 4. Update status lokal visual (opsional, karena modal akan ditutup)
+      setTests((prev) => prev.map((t) => ({ ...t, status: "completed" })));
+
+      toast.success("Semua hasil berhasil disimpan & disinkronisasi!");
+
+      // 5. Tutup modal & refresh data di parent
+      onClose();
     } catch (e) {
-      toast.error("Gagal sinkronisasi data");
+      console.error("Error batch saving:", e);
+      toast.error("Gagal menyimpan beberapa data. Silakan coba lagi.");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
       <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Header */}
         <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-cyan-50">
           <h3 className="font-bold text-lg text-cyan-800 flex items-center gap-2">
             <TestTube2 size={20} /> Input Hasil Lab: {noSampel}
@@ -89,12 +92,13 @@ export default function ResultInputModal({
           <button
             onClick={onClose}
             disabled={saving}
-            className="p-1 hover:bg-gray-100 rounded"
+            className="p-1 hover:bg-gray-100 rounded transition-colors"
           >
             <X size={20} className="text-gray-500" />
           </button>
         </div>
 
+        {/* Content */}
         <div className="p-6 overflow-y-auto flex-1">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12">
@@ -109,18 +113,23 @@ export default function ResultInputModal({
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-gray-500 border-b border-gray-200">
-                  <th className="pb-2">Parameter</th>
+                  <th className="pb-2 pl-2">Parameter</th>
                   <th className="pb-2">Metode</th>
                   <th className="pb-2">Nilai Rujukan</th>
-                  <th className="pb-2 w-32">Hasil</th>
+                  <th className="pb-2 w-40">Hasil</th>
                   <th className="pb-2 w-16">Satuan</th>
                   <th className="pb-2">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {tests.map((test) => (
-                  <tr key={test.id}>
-                    <td className="py-3 font-medium">{test.parameter_name}</td>
+                  <tr
+                    key={test.id}
+                    className="hover:bg-gray-50/50 transition-colors"
+                  >
+                    <td className="py-3 pl-2 font-medium text-gray-700">
+                      {test.parameter_name}
+                    </td>
                     <td className="py-3 text-gray-500 text-xs">
                       {test.metode || "-"}
                     </td>
@@ -128,33 +137,30 @@ export default function ResultInputModal({
                       {test.nilai_rujukan || test.range_normal || "-"}
                     </td>
                     <td className="py-3">
+                      {/* INPUT PERUBAHAN DI SINI */}
                       <input
                         type="text"
-                        className="w-full border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-cyan-500 outline-none"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"
                         value={test.nilai || ""}
-                        onChange={(e) => {
-                          const newTests = [...tests];
-                          const index = newTests.findIndex(
-                            (t) => t.id === test.id
-                          );
-                          newTests[index].nilai = e.target.value;
-                          setTests(newTests);
-                        }}
-                        onBlur={(e) => handleUpdate(test.id, e.target.value)}
-                        placeholder="Input..."
+                        // Hapus onBlur (auto save)
+                        // Gunakan onChange hanya untuk update state lokal
+                        onChange={(e) =>
+                          handleInputChange(test.id, e.target.value)
+                        }
+                        placeholder="Input hasil..."
                         disabled={saving}
                       />
                     </td>
                     <td className="py-3 text-gray-500">{test.satuan}</td>
                     <td className="py-3">
                       <span
-                        className={`px-2 py-1 rounded text-xs ${
+                        className={`px-2 py-1 rounded text-xs font-medium ${
                           test.status === "completed"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-yellow-100 text-yellow-800"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-600"
                         }`}
                       >
-                        {test.status === "completed" ? "Selesai" : "Pending"}
+                        {test.status === "completed" ? "Selesai" : "Draft"}
                       </span>
                     </td>
                   </tr>
@@ -164,23 +170,23 @@ export default function ResultInputModal({
           )}
         </div>
 
+        {/* Footer Actions */}
         <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center">
-          <span className="text-sm text-gray-500">
-            {tests.filter((t) => t.nilai && t.nilai.trim() !== "").length} dari{" "}
-            {tests.length} hasil telah diisi
-          </span>
-          <div className="flex gap-2">
+          <div className="text-xs text-gray-500 italic">
+            *Pastikan semua data benar sebelum menyimpan.
+          </div>
+          <div className="flex gap-3">
             <button
               onClick={onClose}
               disabled={saving}
-              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium disabled:opacity-50"
+              className="px-5 py-2.5 text-gray-600 hover:bg-gray-200 rounded-xl font-medium transition-colors disabled:opacity-50"
             >
               Batal
             </button>
             <button
               onClick={handleSaveAll}
-              disabled={saving || loading}
-              className="bg-cyan-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-cyan-700 flex items-center gap-2 disabled:opacity-50"
+              disabled={saving || loading || tests.length === 0}
+              className="bg-cyan-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-cyan-700 shadow-lg shadow-cyan-600/20 hover:shadow-cyan-600/30 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? (
                 <>
