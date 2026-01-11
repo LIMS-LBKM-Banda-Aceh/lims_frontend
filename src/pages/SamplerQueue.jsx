@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
+// pages/SamplerQueue.jsx
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import api from "../api/axios";
 import { toast } from "react-toastify";
 import {
@@ -14,7 +15,6 @@ import {
   ClipboardList,
   RefreshCw,
   ArrowRight,
-  // Icon tambahan untuk dynamic badges
   Bug,
   Droplets,
   Beef,
@@ -24,16 +24,32 @@ import {
 export default function SamplerQueue({ onRefreshStats }) {
   const [activeTab, setActiveTab] = useState("queue");
   const [dataList, setDataList] = useState([]);
+  const [masterMap, setMasterMap] = useState({}); // State untuk Mapping Nama -> Kategori
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get("/registrations");
-      if (res.data.success) {
-        // Filter relevan: Terdaftar atau Proses Sampling
-        const relevantData = res.data.data.filter((item) =>
+      // Fetch Registration & Master Data secara paralel
+      const [regRes, masterRes] = await Promise.all([
+        api.get("/registrations"),
+        api.get("/master/pemeriksaan"),
+      ]);
+
+      // 1. Proses Master Data menjadi Map/Dictionary agar pencarian cepat
+      // Format: { "Gula Darah": "Kimia Klinik", "Darah Rutin": "Hematologi" }
+      if (masterRes.data.success) {
+        const map = {};
+        masterRes.data.data.forEach((item) => {
+          map[item.nama_pemeriksaan.toLowerCase()] = item.kategori;
+        });
+        setMasterMap(map);
+      }
+
+      // 2. Proses Registration Data
+      if (regRes.data.success) {
+        const relevantData = regRes.data.data.filter((item) =>
           ["terdaftar", "proses_sampling"].includes(item.status)
         );
         setDataList(relevantData);
@@ -42,122 +58,152 @@ export default function SamplerQueue({ onRefreshStats }) {
       console.error(err);
       toast.error("Gagal memuat antrian sampler");
     } finally {
-      setTimeout(() => setLoading(false), 500); // Delay halus untuk UX
+      setTimeout(() => setLoading(false), 500);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
-  // --- LOGIKA DINAMIS JENIS SAMPEL (Diambil dari kode baru) ---
-  const renderSampleBadges = (jenisPemeriksaan) => {
-    if (!jenisPemeriksaan) return null;
+  // --- LOGIKA BARU: RENDER BADGES BERDASARKAN KATEGORI MASTER ---
+  const renderSampleBadges = (jenisPemeriksaanString) => {
+    if (!jenisPemeriksaanString) return null;
 
-    const text = jenisPemeriksaan.toUpperCase();
-    const badges = [];
+    // 1. Parsing String: "Gula Darah (1), Urine Rutin (1)" -> ["gula darah", "urine rutin"]
+    const examNames = jenisPemeriksaanString.split(",").map((str) =>
+      str
+        .trim()
+        .replace(/\s*\(\d+\)$/, "") // Hapus qty "(1)" di belakang
+        .toLowerCase()
+    );
 
-    // Deteksi Vektor/Nyamuk
-    if (
-      text.includes("NYAMUK") ||
-      text.includes("VEKTOR") ||
-      text.includes("LALAT")
-    ) {
-      badges.push(
-        <span
-          key="vektor"
-          className="bg-orange-100 text-orange-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-orange-200 flex items-center gap-1"
-        >
-          <Bug size={10} /> VEKTOR/SERANGGA
-        </span>
-      );
-    }
-    // Deteksi Darah
-    if (
-      text.includes("DARAH") ||
-      text.includes("HEMATOLOGI") ||
-      text.includes("KIMIA KLINIK") ||
-      text.includes("HBSAG")
-    ) {
-      badges.push(
-        <span
-          key="darah"
-          className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-red-200 flex items-center gap-1"
-        >
-          <Droplets size={10} /> DARAH (EDTA/SERUM)
-        </span>
-      );
-    }
-    // Deteksi Urin
-    if (text.includes("URIN") || text.includes("URINALISA")) {
-      badges.push(
-        <span
-          key="urin"
-          className="bg-yellow-100 text-yellow-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-yellow-200 flex items-center gap-1"
-        >
-          <FlaskConical size={10} /> URIN
-        </span>
-      );
-    }
-    // Deteksi Air/Lingkungan
-    if (
-      text.includes("AIR") ||
-      text.includes("KESLING") ||
-      text.includes("SUHU")
-    ) {
-      badges.push(
-        <span
-          key="air"
-          className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-blue-200 flex items-center gap-1"
-        >
-          <Droplets size={10} /> AIR / LINGKUNGAN
-        </span>
-      );
-    }
-    // Deteksi Makanan
-    if (
-      text.includes("MAKANAN") ||
-      text.includes("BORAX") ||
-      text.includes("FORMALIN")
-    ) {
-      badges.push(
-        <span
-          key="makanan"
-          className="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-emerald-200 flex items-center gap-1"
-        >
-          <Beef size={10} /> MAKANAN/SAMPEL PADAT
-        </span>
-      );
-    }
-    // Deteksi PCR/Biomolekuler
-    if (
-      text.includes("PCR") ||
-      text.includes("BIOMOLEKULER") ||
-      text.includes("COVID")
-    ) {
-      badges.push(
-        <span
-          key="pcr"
-          className="bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-purple-200 flex items-center gap-1"
-        >
-          <Microscope size={10} /> SWAB / BIOMOL
+    // 2. Cari Kategori Unik dari MasterMap
+    const detectedCategories = new Set();
+    examNames.forEach((name) => {
+      const cat = masterMap[name];
+      if (cat) detectedCategories.add(cat.toUpperCase());
+    });
+
+    // Jika tidak ada match (misal data master dihapus), fallback ke default
+    if (detectedCategories.size === 0) {
+      return (
+        <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-gray-200 flex items-center gap-1 w-fit">
+          <FlaskConical size={10} /> SAMPEL UMUM
         </span>
       );
     }
 
-    // Default jika tidak terdeteksi
-    if (badges.length === 0) {
-      badges.push(
-        <span
-          key="default"
-          className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-gray-200 flex items-center gap-1"
-        >
-          <FlaskConical size={10} /> SAMPEL LAINNYA
-        </span>
-      );
-    }
+    // 3. Render Badge sesuai Kategori Master
+    return (
+      <div className="flex flex-wrap gap-1">
+        {Array.from(detectedCategories).map((cat) => {
+          // GROUPING KATEGORI KE STYLE BADGE
 
-    return <div className="flex flex-wrap gap-1">{badges}</div>;
+          // -- DARAH (Hematologi, Kimia Klinik, Imunologi) --
+          if (
+            ["HEMATOLOGI", "KIMIA KLINIK", "IMUNOLOGI", "SEROLOGI"].some((c) =>
+              cat.includes(c)
+            )
+          ) {
+            return (
+              <span
+                key={cat}
+                className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-red-200 flex items-center gap-1"
+              >
+                <Droplets size={10} /> {cat}
+              </span>
+            );
+          }
+
+          // -- URIN (Urinalisa) --
+          if (cat.includes("URIN")) {
+            return (
+              <span
+                key={cat}
+                className="bg-yellow-100 text-yellow-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-yellow-200 flex items-center gap-1"
+              >
+                <FlaskConical size={10} /> {cat}
+              </span>
+            );
+          }
+
+          // -- VEKTOR / PARASIT --
+          if (
+            ["VEKTOR", "PARASITOLOGI", "ENTOMOLOGI"].some((c) =>
+              cat.includes(c)
+            )
+          ) {
+            return (
+              <span
+                key={cat}
+                className="bg-orange-100 text-orange-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-orange-200 flex items-center gap-1"
+              >
+                <Bug size={10} /> {cat}
+              </span>
+            );
+          }
+
+          // -- AIR / LINGKUNGAN / FISIKA --
+          if (
+            ["LINGKUNGAN", "AIR", "FISIKA", "LIMBAH"].some((c) =>
+              cat.includes(c)
+            )
+          ) {
+            return (
+              <span
+                key={cat}
+                className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-blue-200 flex items-center gap-1"
+              >
+                <Droplets size={10} /> {cat}
+              </span>
+            );
+          }
+
+          // -- MAKANAN / TOKSIKOLOGI --
+          if (
+            ["MAKANAN", "MINUMAN", "TOKSIKOLOGI", "KIMIA MAKANAN"].some((c) =>
+              cat.includes(c)
+            )
+          ) {
+            return (
+              <span
+                key={cat}
+                className="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-emerald-200 flex items-center gap-1"
+              >
+                <Beef size={10} /> {cat}
+              </span>
+            );
+          }
+
+          // -- BIOMOLEKULER / MIKROBIOLOGI --
+          if (
+            ["BIOMOLEKULER", "PCR", "MIKROBIOLOGI", "BAKTERIOLOGI"].some((c) =>
+              cat.includes(c)
+            )
+          ) {
+            return (
+              <span
+                key={cat}
+                className="bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-purple-200 flex items-center gap-1"
+              >
+                <Microscope size={10} /> {cat}
+              </span>
+            );
+          }
+
+          // -- DEFAULT / LAINNYA --
+          return (
+            <span
+              key={cat}
+              className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded-md font-bold border border-gray-200 flex items-center gap-1"
+            >
+              <FlaskConical size={10} /> {cat}
+            </span>
+          );
+        })}
+      </div>
+    );
   };
 
   // Filter & Search Logic
@@ -212,7 +258,7 @@ export default function SamplerQueue({ onRefreshStats }) {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in p-2 md:p-0">
-      {/* Header Section - Style Lama Tetap */}
+      {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-cyan-50 rounded-xl text-cyan-600">
@@ -252,7 +298,7 @@ export default function SamplerQueue({ onRefreshStats }) {
         </div>
       </div>
 
-      {/* Tabs Navigation - Style Lama Tetap */}
+      {/* Tabs Navigation */}
       <div className="flex bg-gray-100 p-1 rounded-xl w-fit">
         <button
           onClick={() => setActiveTab("queue")}
@@ -296,7 +342,7 @@ export default function SamplerQueue({ onRefreshStats }) {
         </button>
       </div>
 
-      {/* Main Table Card - Style Lama Tetap */}
+      {/* Main Table Card */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -375,10 +421,9 @@ export default function SamplerQueue({ onRefreshStats }) {
                       </div>
                     </td>
 
-                    {/* Kolom 2: Pemeriksaan & Jenis Sampel - UPDATE LOGIKA DISINI */}
+                    {/* Kolom 2: Pemeriksaan & Badges (FIXED) */}
                     <td className="px-6 py-5">
                       <div className="space-y-2">
-                        {/* Memanggil fungsi dynamic badge baru */}
                         {renderSampleBadges(item.jenis_pemeriksaan)}
 
                         <p
@@ -399,7 +444,7 @@ export default function SamplerQueue({ onRefreshStats }) {
                       </div>
                     </td>
 
-                    {/* Kolom 3: Waktu - Style Lama Tetap */}
+                    {/* Kolom 3: Waktu */}
                     <td className="px-6 py-5">
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -422,7 +467,7 @@ export default function SamplerQueue({ onRefreshStats }) {
                       </div>
                     </td>
 
-                    {/* Kolom 4: Aksi - Style Tombol "Mulai Sampling" Lama Tetap */}
+                    {/* Kolom 4: Aksi */}
                     <td className="px-6 py-5">
                       <div className="flex justify-center">
                         {item.status === "terdaftar" ? (
@@ -465,7 +510,7 @@ export default function SamplerQueue({ onRefreshStats }) {
           </table>
         </div>
 
-        {/* Footer Info - Style Lama Tetap */}
+        {/* Footer Info */}
         {!loading && (
           <div className="bg-gray-50/50 px-6 py-4 border-t border-gray-100 flex justify-between items-center text-xs font-bold text-gray-400">
             <div className="flex items-center gap-4">

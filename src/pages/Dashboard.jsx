@@ -38,7 +38,15 @@ const StatCard = ({ title, value, icon: Icon, color, subtext }) => (
   </div>
 );
 
-const DashboardOverview = ({ data, stats, onChangeView, onRefresh }) => {
+// --- PERBAIKAN DI SINI (DashboardOverview) ---
+// 1. Terima props 'userRole'
+const DashboardOverview = ({
+  data,
+  stats,
+  onChangeView,
+  onRefresh,
+  userRole,
+}) => {
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -93,24 +101,30 @@ const DashboardOverview = ({ data, stats, onChangeView, onRefresh }) => {
         />
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
-            <FlaskConical size={20} className="text-cyan-600" /> Pasien Terbaru
-          </h3>
-          <button
-            onClick={() => onChangeView("list")}
-            className="text-sm text-cyan-600 font-medium hover:underline"
-          >
-            Lihat Semua
-          </button>
+      {/* 2. LOGIC FIX: Sembunyikan List Pasien Terbaru jika role adalah 'lab'.
+         Role 'lab' hanya boleh melihat statistik di atas, lalu bekerja via menu 'Antrian Lab'.
+      */}
+      {userRole !== "lab" && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+              <FlaskConical size={20} className="text-cyan-600" /> Pasien
+              Terbaru
+            </h3>
+            <button
+              onClick={() => onChangeView("list")}
+              className="text-sm text-cyan-600 font-medium hover:underline"
+            >
+              Lihat Semua
+            </button>
+          </div>
+          <RegistrationList
+            data={data.slice(0, 5)}
+            onViewDetail={(item) => onChangeView("detail", item)}
+            onRefresh={onRefresh}
+          />
         </div>
-        <RegistrationList
-          data={data.slice(0, 5)}
-          onViewDetail={(item) => onChangeView("detail", item)}
-          onRefresh={onRefresh}
-        />
-      </div>
+      )}
     </div>
   );
 };
@@ -137,7 +151,6 @@ export default function Dashboard() {
         const d = resStats.data.data;
         const mappedStats = {
           total: Number(d.total || 0),
-
           terdaftar: Number(d.waiting_queue || 0),
           in_sampling: Number(d.in_sampling || 0),
           diterima_lab: Number(d.diterima_lab || 0),
@@ -159,34 +172,40 @@ export default function Dashboard() {
     fetchMainData();
   }, [fetchMainData]);
 
-  // Ganti fungsi handleChangeView di Dashboard.jsx Anda dengan ini:
+  const handleChangeView = useCallback(
+    async (newView, item = null) => {
+      // --- TAMBAHAN KEAMANAN ---
+      // Mencegah user lab memaksa masuk ke view list/detail via console/bug
+      if (
+        user?.role === "lab" &&
+        (newView === "list" || newView === "detail")
+      ) {
+        return;
+      }
 
-  const handleChangeView = useCallback(async (newView, item = null) => {
-    if (newView === "detail" && item) {
-      try {
-        // WAJIB: Ambil data lengkap dari server berdasarkan ID
-        // agar array 'details' yang di-JOIN di backend ikut terbawa
-        const res = await api.get(`/registrations/${item.id}`);
-
-        if (res.data.success) {
-          setSelectedRegistration(res.data.data);
-        } else {
-          // Fallback jika gagal
+      if (newView === "detail" && item) {
+        try {
+          const res = await api.get(`/registrations/${item.id}`);
+          if (res.data.success) {
+            setSelectedRegistration(res.data.data);
+          } else {
+            setSelectedRegistration(item);
+          }
+        } catch (error) {
+          console.error("Gagal mengambil rincian pasien:", error);
           setSelectedRegistration(item);
         }
-      } catch (error) {
-        console.error("Gagal mengambil rincian pasien:", error);
+      } else if (item) {
         setSelectedRegistration(item);
+      } else {
+        setSelectedRegistration(null);
       }
-    } else if (item) {
-      setSelectedRegistration(item);
-    } else {
-      setSelectedRegistration(null);
-    }
 
-    setView(newView);
-    setIsMobileOpen(false);
-  }, []);
+      setView(newView);
+      setIsMobileOpen(false);
+    },
+    [user?.role]
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 flex font-sans">
@@ -244,8 +263,14 @@ export default function Dashboard() {
                   stats={stats}
                   onChangeView={handleChangeView}
                   onRefresh={fetchMainData}
+                  userRole={user?.role} // 3. Passing Role ke Component
                 />
               )}
+
+              {/* View create/list/detail akan tetap tersembunyi karena
+                  role 'lab' tidak memiliki akses menu untuk men-trigger view ini 
+                  via sidebar, dan tombol 'Lihat Semua' sudah dihilangkan di atas.
+              */}
               {view === "create" && (
                 <RegistrationForm
                   onSuccess={() => {
@@ -260,12 +285,14 @@ export default function Dashboard() {
                     <h2 className="text-2xl font-bold text-gray-800">
                       Data Pasien
                     </h2>
-                    <button
-                      onClick={() => setView("create")}
-                      className="bg-cyan-600 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2"
-                    >
-                      <PlusCircle size={18} /> Tambah Baru
-                    </button>
+                    {(user.role === "admin" || user.role === "input") && (
+                      <button
+                        onClick={() => setView("create")}
+                        className="bg-cyan-600 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2"
+                      >
+                        <PlusCircle size={18} /> Tambah Baru
+                      </button>
+                    )}
                   </div>
                   <RegistrationList
                     data={registrations}
@@ -281,7 +308,6 @@ export default function Dashboard() {
                 />
               )}
 
-              {/* --- PERBAIKAN: OPER PROPS KE CHILD --- */}
               {view === "lab-queue" && (
                 <LabQueue onRefreshStats={fetchMainData} />
               )}
