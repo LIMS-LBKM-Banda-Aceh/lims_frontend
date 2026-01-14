@@ -1,3 +1,4 @@
+// pages/RegistrationForm.jsx
 import { useState, useEffect } from "react";
 import api from "../api/axios";
 import { toast } from "react-toastify";
@@ -9,10 +10,12 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   Search,
-  Clock, // Pastikan Clock diimport
+  Clock,
+  Plus,
+  Minus,
 } from "lucide-react";
 
-// --- Reusable Components (FormInput, FormSelect, FormTextarea) TETAP SAMA ---
+// --- Reusable Components ---
 const FormInput = ({ label, icon: Icon, type = "text", ...props }) => (
   <div className="space-y-1.5">
     <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -54,8 +57,8 @@ const FormTextarea = ({ label, ...props }) => (
   </div>
 );
 
-// --- EXAMINATION SELECTOR TETAP SAMA ---
-const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
+// --- EXAMINATION SELECTOR DENGAN QUANTITY ---
+const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const groupedData = masterData.reduce((acc, item) => {
@@ -64,11 +67,41 @@ const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
     return acc;
   }, {});
 
-  const handleToggle = (id) => {
-    if (selectedIds.includes(id)) {
-      onChange(selectedIds.filter((sid) => sid !== id));
+  // Fungsi Helper: Cek apakah item sudah dipilih & ambil qty-nya
+  const getItemQty = (id) => {
+    const found = selectedItems.find((i) => i.id === id);
+    return found ? found.qty : 0;
+  };
+
+  const handleAdd = (item) => {
+    const existing = selectedItems.find((i) => i.id === item.id);
+    if (existing) {
+      // Increment Qty
+      onChange(
+        selectedItems.map((i) =>
+          i.id === item.id ? { ...i, qty: i.qty + 1 } : i
+        )
+      );
     } else {
-      onChange([...selectedIds, id]);
+      // Add New
+      onChange([...selectedItems, { ...item, qty: 1 }]);
+    }
+  };
+
+  const handleRemove = (item) => {
+    const existing = selectedItems.find((i) => i.id === item.id);
+    if (existing) {
+      if (existing.qty > 1) {
+        // Decrement Qty
+        onChange(
+          selectedItems.map((i) =>
+            i.id === item.id ? { ...i, qty: i.qty - 1 } : i
+          )
+        );
+      } else {
+        // Remove completely if qty becomes 0
+        onChange(selectedItems.filter((i) => i.id !== item.id));
+      }
     }
   };
 
@@ -90,7 +123,7 @@ const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
           <Search size={16} className="absolute left-3 top-3 text-gray-400" />
           <input
             type="text"
-            placeholder="Cari pemeriksaan (misal: Gula Darah)..."
+            placeholder="Cari pemeriksaan (misal: Gula Darah, Nyamuk)..."
             className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-cyan-200 text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -98,7 +131,7 @@ const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
         </div>
       </div>
 
-      <div className="max-h-[300px] overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+      <div className="max-h-[400px] overflow-y-auto space-y-4 pr-2 custom-scrollbar">
         {Object.entries(groupedData).map(([category, items]) => {
           const filteredItems = items.filter((item) =>
             item.nama_pemeriksaan
@@ -110,33 +143,62 @@ const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
 
           return (
             <div key={category}>
-              <h4 className="text-xs font-bold text-cyan-700 uppercase tracking-wider mb-2 sticky top-0 bg-gray-50 py-1">
+              <h4 className="text-xs font-bold text-cyan-700 uppercase tracking-wider mb-2 sticky top-0 bg-gray-50 py-1 z-10">
                 {category}
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {filteredItems.map((item) => {
-                  const isSelected = selectedIds.includes(item.id);
+                  const qty = getItemQty(item.id);
+                  const isSelected = qty > 0;
+
                   return (
                     <div
                       key={item.id}
-                      onClick={() => handleToggle(item.id)}
-                      className={`cursor-pointer p-3 rounded-lg border transition-all flex justify-between items-center ${
+                      className={`p-3 rounded-lg border transition-all flex justify-between items-center ${
                         isSelected
                           ? "bg-cyan-50 border-cyan-500 shadow-sm"
-                          : "bg-white border-gray-200 hover:border-cyan-300"
+                          : "bg-white border-gray-200"
                       }`}
                     >
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">
+                      <div className="flex-1 min-w-0 pr-2">
+                        <p
+                          className="text-sm font-medium text-gray-800 truncate"
+                          title={item.nama_pemeriksaan}
+                        >
                           {item.nama_pemeriksaan}
                         </p>
                         <p className="text-xs text-gray-500">
                           {formatRupiah(item.harga)}
                         </p>
                       </div>
-                      {isSelected && (
-                        <CheckCircle2 size={18} className="text-cyan-600" />
-                      )}
+
+                      {/* QUANTITY CONTROLS */}
+                      <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1">
+                        <button
+                          type="button"
+                          onClick={() => handleRemove(item)}
+                          disabled={!isSelected}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-gray-100 hover:bg-gray-200 text-gray-600 disabled:opacity-30 transition"
+                        >
+                          <Minus size={12} />
+                        </button>
+
+                        <span
+                          className={`text-xs font-bold w-4 text-center ${
+                            isSelected ? "text-cyan-700" : "text-gray-300"
+                          }`}
+                        >
+                          {qty}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => handleAdd(item)}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-cyan-100 hover:bg-cyan-200 text-cyan-700 transition"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -153,11 +215,31 @@ const ExaminationSelector = ({ selectedIds, onChange, masterData }) => {
 export default function RegistrationForm({ onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [masterPemeriksaan, setMasterPemeriksaan] = useState([]);
-  const [selectedPemeriksaanIds, setSelectedPemeriksaanIds] = useState([]);
+
+  // [MODIFIED] State ini sekarang menyimpan Array of Object: [{ id, nama, harga, qty }]
+  const [selectedItems, setSelectedItems] = useState([]);
+
   const [totalBiaya, setTotalBiaya] = useState(0);
 
-  // [NEW] State untuk menyimpan detail item yang dipilih (untuk display)
-  const [selectedItemsDetails, setSelectedItemsDetails] = useState([]);
+  const [form, setForm] = useState({
+    nama_pasien: "",
+    nik: "",
+    tgl_lahir: "",
+    umur: "",
+    jenis_kelamin: "L",
+    alamat: "",
+    no_kontak: "",
+    asal_sampel: "Mandiri",
+    status_pembayaran: "berbayar",
+    pengirim_instansi: "",
+    tgl_daftar: new Date().toISOString().split("T")[0],
+    waktu_daftar: new Date().toLocaleTimeString("it-IT", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    tgl_pengambilan: "",
+    catatan_tambahan: "",
+  });
 
   useEffect(() => {
     const fetchMaster = async () => {
@@ -174,45 +256,18 @@ export default function RegistrationForm({ onSuccess }) {
     fetchMaster();
   }, []);
 
-  // Hitung Total Biaya & Update List Detail Item
+  // Hitung Total Biaya (Support Quantity)
   useEffect(() => {
-    // Filter item master berdasarkan ID yang dipilih
-    const selectedItems = masterPemeriksaan.filter((item) =>
-      selectedPemeriksaanIds.includes(item.id)
-    );
-
-    // Update state detail untuk ditampilkan
-    setSelectedItemsDetails(selectedItems);
-
-    // Hitung total
-    const total = selectedItems.reduce(
-      (sum, item) => sum + Number(item.harga),
-      0
-    );
-    setTotalBiaya(total);
-  }, [selectedPemeriksaanIds, masterPemeriksaan]);
-
-  const [form, setForm] = useState({
-    nama_pasien: "",
-    nik: "",
-    tgl_lahir: "",
-    umur: "",
-    jenis_kelamin: "L",
-    alamat: "",
-    no_kontak: "",
-    asal_sampel: "mandiri",
-    no_sampel_asal: "",
-    coding: "",
-    tgl_terima: new Date().toISOString().split("T")[0],
-    waktu_sampling: new Date().toLocaleTimeString("it-IT", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-    tgl_pengambilan: "",
-    ket_pengerjaan: "",
-    ket_pengiriman: "",
-    form_pe: "",
-  });
+    if (form.status_pembayaran === "gratis") {
+      setTotalBiaya(0);
+    } else {
+      const total = selectedItems.reduce(
+        (sum, item) => sum + Number(item.harga) * item.qty,
+        0
+      );
+      setTotalBiaya(total);
+    }
+  }, [selectedItems, form.status_pembayaran]);
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -230,22 +285,23 @@ export default function RegistrationForm({ onSuccess }) {
         age--;
       }
 
-      setForm((prev) => ({ ...prev, umur: age < 0 ? 0 : age }));
+      setForm((prev) => ({ ...prev, umur: Math.max(age, 0) }));
     }
   }, [form.tgl_lahir]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (selectedPemeriksaanIds.length === 0) {
+    if (selectedItems.length === 0) {
       toast.warning("Mohon pilih minimal satu jenis pemeriksaan");
       return;
     }
 
     setLoading(true);
 
+    // [MODIFIED] Payload sekarang mengirim 'items' array dengan quantity
     const payload = {
       ...form,
-      pemeriksaan_ids: selectedPemeriksaanIds,
+      items: selectedItems.map((item) => ({ id: item.id, qty: item.qty })),
     };
 
     Object.keys(payload).forEach((key) => {
@@ -261,13 +317,14 @@ export default function RegistrationForm({ onSuccess }) {
         ...form,
         nama_pasien: "",
         nik: "",
-        waktu_sampling: new Date().toLocaleTimeString("it-IT", {
+        waktu_daftar: new Date().toLocaleTimeString("it-IT", {
           hour: "2-digit",
           minute: "2-digit",
         }),
       });
-      setSelectedPemeriksaanIds([]);
+      setSelectedItems([]); // Reset items
     } catch (error) {
+      console.error(error);
       toast.error(error.response?.data?.message || "Gagal menyimpan data");
     } finally {
       setLoading(false);
@@ -295,7 +352,6 @@ export default function RegistrationForm({ onSuccess }) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
-        {/* SECTION 1: DATA PASIEN */}
         <div>
           <h3 className="text-base font-bold text-cyan-700 mb-4 flex items-center gap-2">
             <User size={18} /> Identitas Pasien
@@ -316,7 +372,6 @@ export default function RegistrationForm({ onSuccess }) {
               onChange={handleChange}
               placeholder="16 digit NIK"
             />
-
             <div className="grid grid-cols-2 gap-3">
               <FormInput
                 label="Tgl Lahir"
@@ -334,7 +389,6 @@ export default function RegistrationForm({ onSuccess }) {
                 placeholder="Otomatis"
               />
             </div>
-
             <FormSelect
               label="Jenis Kelamin"
               name="jenis_kelamin"
@@ -344,7 +398,6 @@ export default function RegistrationForm({ onSuccess }) {
               <option value="L">Laki-laki</option>
               <option value="P">Perempuan</option>
             </FormSelect>
-
             <FormInput
               label="No. Kontak / HP"
               name="no_kontak"
@@ -352,7 +405,6 @@ export default function RegistrationForm({ onSuccess }) {
               onChange={handleChange}
               placeholder="08..."
             />
-
             <div className="lg:col-span-3">
               <FormTextarea
                 label="Alamat Lengkap"
@@ -374,12 +426,12 @@ export default function RegistrationForm({ onSuccess }) {
           </h3>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Bagian Kiri: Selector */}
+            {/* Bagian Kiri: Selector dengan Quantity */}
             <div className="lg:col-span-2">
               <ExaminationSelector
                 masterData={masterPemeriksaan}
-                selectedIds={selectedPemeriksaanIds}
-                onChange={setSelectedPemeriksaanIds}
+                selectedItems={selectedItems}
+                onChange={setSelectedItems}
               />
             </div>
 
@@ -395,57 +447,100 @@ export default function RegistrationForm({ onSuccess }) {
                   </p>
                 </div>
 
-                {/* [NEW] DAFTAR ITEM YANG DIPILIH */}
-                {selectedItemsDetails.length > 0 && (
+                {/* DAFTAR ITEM YANG DIPILIH */}
+                {selectedItems.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-cyan-200/50">
                     <p className="text-[10px] uppercase font-bold text-cyan-800 mb-2">
                       Item Terpilih:
                     </p>
                     <ul className="space-y-1 max-h-40 overflow-y-auto custom-scrollbar pr-1">
-                      {selectedItemsDetails.map((item) => (
+                      {selectedItems.map((item) => (
                         <li
                           key={item.id}
-                          className="text-xs text-cyan-900 flex justify-between border-b border-cyan-100 pb-1 last:border-0"
+                          className="text-xs text-cyan-900 flex justify-between border-b border-cyan-100 pb-1 last:border-0 items-center"
                         >
                           <span
-                            className="truncate w-2/3"
+                            className="truncate w-1/2"
                             title={item.nama_pemeriksaan}
                           >
                             {item.nama_pemeriksaan}
                           </span>
-                          <span className="font-mono text-cyan-700">
-                            {formatRupiah(item.harga).split(",")[0]}
-                          </span>
+                          <div className="flex gap-2">
+                            <span className="font-bold text-xs bg-white px-1.5 rounded border border-cyan-200 text-cyan-700">
+                              x{item.qty}
+                            </span>
+                            <span className="font-mono text-cyan-700">
+                              {
+                                formatRupiah(item.harga * item.qty).split(
+                                  ","
+                                )[0]
+                              }
+                            </span>
+                          </div>
                         </li>
                       ))}
                     </ul>
                   </div>
                 )}
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* 1. Pilihan Asal Sampel */}
+                <FormSelect
+                  label="Asal Sampel"
+                  name="asal_sampel"
+                  value={form.asal_sampel}
+                  onChange={(e) => {
+                    const newVal = e.target.value;
+                    setForm((prev) => ({
+                      ...prev,
+                      asal_sampel: newVal,
+                      status_pembayaran:
+                        newVal === "Mandiri"
+                          ? "berbayar"
+                          : prev.status_pembayaran,
+                    }));
+                  }}
+                >
+                  <option value="Mandiri">Mandiri (Umum)</option>
+                  <option value="Rujukan">Rujukan (Faskes/RS)</option>
+                </FormSelect>
+
+                {/* 2. Opsi Status Pembayaran */}
+                {form.asal_sampel === "Rujukan" && (
+                  <FormSelect
+                    label="Status Pembayaran"
+                    name="status_pembayaran"
+                    value={form.status_pembayaran}
+                    onChange={handleChange}
+                  >
+                    <option value="berbayar">Berbayar</option>
+                    <option value="gratis">Tidak Berbayar / Program</option>
+                  </FormSelect>
+                )}
+              </div>
 
               <FormInput
-                label="Asal Sampel"
-                name="asal_sampel"
-                value={form.asal_sampel}
+                label="Pengirim/Instansi"
+                name="pengirim_instansi"
+                value={form.pengirim_instansi}
                 onChange={handleChange}
-                placeholder="Mandiri / RSUD..."
+                placeholder="Jika ada"
               />
-
               <div className="grid grid-cols-2 gap-3">
                 <FormInput
-                  label="Tgl Terima"
+                  label="Tgl Daftar"
                   type="date"
-                  name="tgl_terima"
-                  value={form.tgl_terima}
+                  name="tgl_daftar"
+                  value={form.tgl_daftar}
                   onChange={handleChange}
                   icon={CalendarDays}
                 />
 
                 <FormInput
-                  label="Jam Terima"
+                  label="Jam Daftar"
                   type="time"
-                  name="waktu_sampling"
-                  value={form.waktu_sampling}
+                  name="waktu_daftar"
+                  value={form.waktu_daftar}
                   onChange={handleChange}
                   icon={Clock}
                 />
@@ -456,28 +551,15 @@ export default function RegistrationForm({ onSuccess }) {
 
         <hr className="border-gray-100" />
 
-        {/* SECTION 3: KETERANGAN TAMBAHAN */}
         <div>
           <h3 className="text-base font-bold text-gray-500 mb-4 flex items-center gap-2">
             <FileSpreadsheet size={18} /> Keterangan Tambahan
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <FormInput
-              label="Ket. Pengerjaan"
-              name="ket_pengerjaan"
-              value={form.ket_pengerjaan}
-              onChange={handleChange}
-            />
-            <FormInput
-              label="Ket. Pengiriman"
-              name="ket_pengiriman"
-              value={form.ket_pengiriman}
-              onChange={handleChange}
-            />
-            <FormInput
-              label="Form PE"
-              name="form_pe"
-              value={form.form_pe}
+          <div className="lg:col-span-3">
+            <FormTextarea
+              label="Catatan Tambahan"
+              name="catatan_tambahan"
+              value={form.catatan_tambahan}
               onChange={handleChange}
             />
           </div>

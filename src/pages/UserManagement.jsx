@@ -26,7 +26,8 @@ export default function UserManagement() {
   const [formData, setFormData] = useState({
     id: null,
     username: "",
-    password: "", // Optional saat edit
+    fullname: "",
+    password: "",
     role: "input",
   });
 
@@ -55,10 +56,10 @@ export default function UserManagement() {
 
   const handleEdit = (user) => {
     setIsEditing(true);
-    // Password dikosongkan saat edit, hanya diisi jika ingin mengubah
     setFormData({
       id: user.id,
       username: user.username,
+      fullname: user.fullname || "",
       password: "",
       role: user.role,
     });
@@ -83,18 +84,16 @@ export default function UserManagement() {
 
     try {
       if (isEditing) {
-        // Mode Edit
         const payload = {
           username: formData.username,
+          fullname: formData.fullname,
           role: formData.role,
         };
-        // Hanya kirim password jika diisi
         if (formData.password) payload.password = formData.password;
 
         await api.put(`/users/${formData.id}`, payload);
         toast.success("Data user diperbarui");
       } else {
-        // Mode Create (Register)
         if (!formData.password) {
           toast.warn("Password wajib diisi untuk user baru");
           setSubmitLoading(false);
@@ -114,17 +113,19 @@ export default function UserManagement() {
     }
   };
 
-  // Filter users based on search
   const filteredUsers = users.filter((u) =>
     u.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Helper Badge Role
   const RoleBadge = ({ role }) => {
     const styles = {
       admin: "bg-purple-100 text-purple-700 border-purple-200",
+      kasir: "bg-pink-50 text-pink-700 border-pink-200",
       input: "bg-blue-50 text-blue-700 border-blue-200",
       lab: "bg-orange-50 text-orange-700 border-orange-200",
+      sampler: "bg-yellow-50 text-yellow-700 border-yellow-200",
+      validator: "bg-green-50 text-green-700 border-green-200",
+      manajemen: "bg-gray-100 text-gray-700 border-gray-200",
     };
     return (
       <span
@@ -139,7 +140,6 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -157,9 +157,7 @@ export default function UserManagement() {
         </button>
       </div>
 
-      {/* Table Container */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {/* Toolbar */}
         <div className="p-4 border-b border-gray-100 flex items-center gap-3">
           <div className="relative flex-1 max-w-sm">
             <Search
@@ -179,7 +177,6 @@ export default function UserManagement() {
           </div>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-50/50 text-gray-500 font-semibold border-b border-gray-100">
@@ -211,12 +208,19 @@ export default function UserManagement() {
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-gray-600 font-bold border border-gray-200">
-                          {item.username.charAt(0).toUpperCase()}
+                        <div className="w-9 h-9 rounded-full bg-linear-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-sm">
+                          {(item.fullname || item.username)
+                            .charAt(0)
+                            .toUpperCase()}
                         </div>
-                        <span className="font-semibold text-gray-800">
-                          {item.username}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-gray-800">
+                            {item.fullname || "No Name"}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            @{item.username}
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -255,7 +259,6 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {/* --- MODAL FORM --- */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
@@ -290,6 +293,22 @@ export default function UserManagement() {
 
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <User size={16} className="text-cyan-600" /> Nama Lengkap
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all text-sm"
+                  value={formData.fullname}
+                  onChange={(e) =>
+                    setFormData({ ...formData, fullname: e.target.value })
+                  }
+                  placeholder="Contoh: Dr. Budi Santoso"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                   <Shield size={16} className="text-cyan-600" /> Role / Akses
                 </label>
                 <select
@@ -299,11 +318,20 @@ export default function UserManagement() {
                     setFormData({ ...formData, role: e.target.value })
                   }
                 >
-                  <option value="input">Input (Staff Pendaftaran)</option>
-                  <option value="lab">Lab (Petugas Lab)</option>
+                  <option value="input">Input (Pendaftaran)</option>
+                  <option value="kasir">Kasir (Pendaftaran)</option>
+                  <option value="sampler">Sampler (Pengambil Sampel)</option>
+                  <option value="lab">Lab (Petugas Lab / Analis)</option>
+                  <option value="validator">
+                    Validator (Dokter / Penanggung Jawab)
+                  </option>
+                  <option value="manajemen">
+                    Manajemen (Laporan View Only)
+                  </option>
                   <option value="admin">Admin (Full Akses)</option>
                 </select>
               </div>
+              {/* ------------------------------------------------------------------- */}
 
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -311,7 +339,6 @@ export default function UserManagement() {
                 </label>
                 <input
                   type="password"
-                  // Required hanya jika mode Create
                   required={!isEditing}
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all text-sm"
                   value={formData.password}
@@ -324,11 +351,6 @@ export default function UserManagement() {
                       : "Minimal 6 karakter"
                   }
                 />
-                {isEditing && (
-                  <p className="text-[10px] text-gray-400 italic ml-1">
-                    *Isi hanya jika ingin mereset password user ini.
-                  </p>
-                )}
               </div>
 
               <div className="pt-4 flex gap-3">

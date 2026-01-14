@@ -18,37 +18,48 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowUpDown,
+  FileText,
+  Package,
+  Minus,
+  Activity,
+  ClipboardList,
 } from "lucide-react";
 
 export default function MasterPemeriksaan() {
+  // --- STATE DATA UTAMA ---
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // State UI Controls
+  // --- STATE UI CONTROLS (Filter, Sort, Pagination) ---
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Semua");
   const [currentPage, setCurrentPage] = useState(1);
-
-  // [MODIFIKASI 1] Ubah state itemsPerPage agar bisa di-set (default 10)
   const [itemsPerPage, setItemsPerPage] = useState(10);
-
   const [sortConfig, setSortConfig] = useState({
     key: "nama_pemeriksaan",
     direction: "asc",
   });
 
-  // Modal State
+  // --- MODAL & FORM STATE ---
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
 
+  // Form Data (Gabungan Logic Baru ke dalam State Lama)
   const [formData, setFormData] = useState({
     id: null,
+    tipe: "tunggal", // 'tunggal' | 'paket'
     kategori: "",
     nama_pemeriksaan: "",
-    satuan: "",
     harga: "",
+    // Field khusus Tunggal
+    satuan: "",
+    nilai_rujukan: "",
+    metode: "",
   });
+
+  // State khusus untuk Parameters (Logic Paket)
+  const [parameters, setParameters] = useState([]);
 
   useEffect(() => {
     fetchData();
@@ -69,8 +80,7 @@ export default function MasterPemeriksaan() {
     }
   };
 
-  // --- LOGIC: FILTER & SORTING ---
-
+  // --- LOGIC: FILTER & SORTING (Sama seperti kode lama) ---
   const categories = useMemo(() => {
     const cats = data.map((item) => item.kategori).filter(Boolean);
     return ["Semua", ...new Set(cats)];
@@ -79,12 +89,10 @@ export default function MasterPemeriksaan() {
   const processedData = useMemo(() => {
     let filtered = data;
 
-    // Filter by Category
     if (selectedCategory !== "Semua") {
       filtered = filtered.filter((item) => item.kategori === selectedCategory);
     }
 
-    // Filter by Search
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -94,15 +102,14 @@ export default function MasterPemeriksaan() {
       );
     }
 
-    // Sorting
     if (sortConfig.key) {
       filtered.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
-          return sortConfig.direction === "asc" ? -1 : 1;
-        }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
-          return sortConfig.direction === "asc" ? 1 : -1;
-        }
+        // Handle sorting for possibly nested or missing keys safely
+        const valA = a[sortConfig.key] || "";
+        const valB = b[sortConfig.key] || "";
+
+        if (valA < valB) return sortConfig.direction === "asc" ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === "asc" ? 1 : -1;
         return 0;
       });
     }
@@ -110,14 +117,49 @@ export default function MasterPemeriksaan() {
     return filtered;
   }, [data, selectedCategory, searchTerm, sortConfig]);
 
-  // --- PAGINATION ---
+  // --- PAGINATION CALCULATION ---
   const totalPages = Math.ceil(processedData.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = processedData.slice(indexOfFirstItem, indexOfLastItem);
 
-  // --- HANDLERS ---
+  // --- HELPER FORMATTER ---
+  const handlePriceChange = (e) => {
+    let val = e.target.value.replaceAll(/\D/g, "");
+    setFormData({ ...formData, harga: val });
+  };
 
+  const getFormattedPrice = (price) => {
+    if (!price && price !== 0) return "";
+    return new Intl.NumberFormat("id-ID").format(price);
+  };
+
+  const formatRupiahDisplay = (num) =>
+    new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+    }).format(num);
+
+  // --- HANDLERS PARAMETER (LOGIC BARU) ---
+  const addParameter = () => {
+    setParameters([
+      ...parameters,
+      { parameter_name: "", satuan: "", nilai_rujukan: "", metode: "" },
+    ]);
+  };
+
+  const updateParameter = (index, field, value) => {
+    const newParams = [...parameters];
+    newParams[index][field] = value;
+    setParameters(newParams);
+  };
+
+  const removeParameter = (index) => {
+    setParameters(parameters.filter((_, i) => i !== index));
+  };
+
+  // --- HANDLERS UTAMA ---
   const handleSort = (key) => {
     let direction = "asc";
     if (sortConfig.key === key && sortConfig.direction === "asc") {
@@ -126,25 +168,6 @@ export default function MasterPemeriksaan() {
     setSortConfig({ key, direction });
   };
 
-  // [MODIFIKASI 2] Handler untuk mengubah jumlah baris
-  const handleItemsPerPageChange = (e) => {
-    setItemsPerPage(Number(e.target.value));
-    setCurrentPage(1); // Reset ke halaman 1 agar UX lebih baik
-  };
-
-  // --- NEW: FORMATTER HARGA INPUT ---
-  const handlePriceChange = (e) => {
-    // Ambil value, hapus semua karakter selain angka
-    let val = e.target.value.replaceAll(/\D/g, "");
-    setFormData({ ...formData, harga: val });
-  };
-
-  const getFormattedPrice = (price) => {
-    if (!price) return "";
-    return new Intl.NumberFormat("id-ID").format(price);
-  };
-  // ----------------------------------
-
   const handleAddNew = () => {
     setIsEditing(false);
     const prefilledCategory =
@@ -152,24 +175,56 @@ export default function MasterPemeriksaan() {
 
     setFormData({
       id: null,
+      tipe: "tunggal",
       kategori: prefilledCategory,
       nama_pemeriksaan: "",
-      satuan: "",
       harga: "",
+      satuan: "",
+      nilai_rujukan: "",
+      metode: "",
     });
+    setParameters([]);
     setShowModal(true);
   };
 
-  const handleEdit = (item) => {
-    setIsEditing(true);
-    setFormData({
-      id: item.id,
-      kategori: item.kategori,
-      nama_pemeriksaan: item.nama_pemeriksaan,
-      satuan: item.satuan,
-      harga: item.harga,
-    });
-    setShowModal(true);
+  const handleEdit = async (item) => {
+    // 1. Tampilkan loading sebentar (opsional) atau langsung fetch
+    try {
+      // Kita ambil data detail yang LENGKAP dari backend (termasuk array parameters)
+      const res = await api.get(`/master/pemeriksaan/${item.id}/detail`);
+
+      if (res.data.success) {
+        const fullData = res.data.data;
+
+        setIsEditing(true);
+
+        // 2. Set Form Data Utama
+        setFormData({
+          id: fullData.id,
+          tipe: fullData.tipe || "tunggal",
+          kategori: fullData.kategori,
+          nama_pemeriksaan: fullData.nama_pemeriksaan,
+          harga: fullData.harga,
+          satuan: fullData.satuan || "",
+          nilai_rujukan: fullData.nilai_rujukan || "",
+          metode: fullData.metode || "",
+        });
+
+        // 3. Set Parameters (Ini kuncinya)
+        // Backend kamu mengembalikan array parameters di sini
+        if (fullData.tipe === "paket" && fullData.parameters) {
+          setParameters(fullData.parameters);
+        } else {
+          setParameters([]);
+        }
+
+        // 4. Buka Modal
+        setShowModal(true);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Gagal mengambil detail parameter pemeriksaan");
+    }
   };
 
   const handleDelete = async (id, nama) => {
@@ -184,32 +239,52 @@ export default function MasterPemeriksaan() {
     }
   };
 
+  // MasterPemeriksaan.jsx - FUNGSI YANG BENAR (PENGGANTI)
+  // MasterPemeriksaan.jsx
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitLoading(true);
+
+    // Persiapan Payload
+    const payload = {
+      ...formData,
+      parameters: formData.tipe === "paket" ? parameters : [],
+    };
+
+    // Validasi Paket
+    if (formData.tipe === "paket") {
+      if (parameters.length === 0) {
+        toast.error("Paket pemeriksaan harus memiliki minimal 1 parameter");
+        setSubmitLoading(false);
+        return;
+      }
+    }
+
     try {
       if (isEditing) {
-        await api.put(`/master/pemeriksaan/${formData.id}`, formData);
+        // PERBAIKAN DISINI: Tambahkan '/with-parameters' pada URL
+        await api.put(
+          `/master/pemeriksaan/${formData.id}/with-parameters`,
+          payload
+        );
         toast.success("Data berhasil diperbarui");
       } else {
-        await api.post("/master/pemeriksaan", formData);
+        // Create juga menggunakan endpoint with-parameters
+        await api.post("/master/pemeriksaan/with-parameters", payload);
         toast.success("Data berhasil ditambahkan");
       }
       setShowModal(false);
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.message || "Terjadi kesalahan");
+      console.error(error); // Log error agar terlihat di console
+      toast.error(
+        error.response?.data?.message || "Terjadi kesalahan saat menyimpan"
+      );
     } finally {
       setSubmitLoading(false);
     }
   };
-
-  const formatRupiahDisplay = (num) =>
-    new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(num);
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
@@ -235,7 +310,6 @@ export default function MasterPemeriksaan() {
       {/* --- FILTER & TABS AREA --- */}
       <div className="bg-white p-1 rounded-2xl shadow-sm border border-gray-100">
         <div className="p-4 pb-0">
-          {/* Search Bar */}
           <div className="relative mb-4">
             <Search
               size={18}
@@ -248,13 +322,12 @@ export default function MasterPemeriksaan() {
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
-                setCurrentPage(1); // Reset ke halaman 1 saat search
+                setCurrentPage(1);
               }}
             />
           </div>
         </div>
 
-        {/* Categories Tabs */}
         <div className="flex items-center gap-2 overflow-x-auto px-4 pb-4 custom-scrollbar">
           <Filter size={16} className="text-gray-400 shrink-0 mr-2" />
           {categories.map((cat) => (
@@ -294,6 +367,7 @@ export default function MasterPemeriksaan() {
                     />
                   </div>
                 </th>
+                <th className="px-6 py-4">Tipe</th>
                 <th
                   className="px-6 py-4 cursor-pointer hover:bg-gray-100 transition-colors group"
                   onClick={() => handleSort("kategori")}
@@ -306,7 +380,7 @@ export default function MasterPemeriksaan() {
                     />
                   </div>
                 </th>
-                <th className="px-6 py-4">Satuan</th>
+                <th className="px-6 py-4">Satuan / Info</th>
                 <th
                   className="px-6 py-4 cursor-pointer hover:bg-gray-100 transition-colors group"
                   onClick={() => handleSort("harga")}
@@ -326,7 +400,7 @@ export default function MasterPemeriksaan() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan="5"
+                    colSpan="6"
                     className="text-center py-12 text-gray-400 flex flex-col items-center"
                   >
                     <Loader2 className="animate-spin mb-2" /> Memuat data...
@@ -334,7 +408,7 @@ export default function MasterPemeriksaan() {
                 </tr>
               ) : currentItems.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="text-center py-12 text-gray-400">
+                  <td colSpan="6" className="text-center py-12 text-gray-400">
                     Tidak ada data ditemukan.
                   </td>
                 </tr>
@@ -348,11 +422,31 @@ export default function MasterPemeriksaan() {
                       {item.nama_pemeriksaan}
                     </td>
                     <td className="px-6 py-4">
+                      {item.tipe === "paket" ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                          <Package size={12} /> Paket
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                          <FileText size={12} /> Tunggal
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
                         {item.kategori}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-500">{item.satuan}</td>
+                    <td className="px-6 py-4 text-gray-500">
+                      {item.tipe === "paket" ? (
+                        <span className="italic text-gray-400 text-xs">
+                          {/* Ganti item.parameters?.length menjadi item.total_parameters */}
+                          {item.total_parameters || 0} parameter
+                        </span>
+                      ) : (
+                        item.satuan || "-"
+                      )}
+                    </td>
                     <td className="px-6 py-4 font-mono font-medium text-cyan-700">
                       {formatRupiahDisplay(item.harga)}
                     </td>
@@ -383,22 +477,23 @@ export default function MasterPemeriksaan() {
           </table>
         </div>
 
-        {/* [MODIFIKASI 3] Pagination Footer yang Diperbarui */}
+        {/* Pagination Footer */}
         {processedData.length > 0 && (
           <div className="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 bg-gray-50/50">
-            {/* Bagian Kiri: Info Data & Selector Rows */}
             <div className="flex items-center gap-4 text-sm text-gray-500">
               <span>
                 Menampilkan {indexOfFirstItem + 1}-
                 {Math.min(indexOfLastItem, processedData.length)} dari{" "}
                 {processedData.length} data
               </span>
-
               <div className="flex items-center gap-2 pl-4 border-l border-gray-200">
                 <span>Tampilkan:</span>
                 <select
                   value={itemsPerPage}
-                  onChange={handleItemsPerPageChange}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
                   className="bg-white border border-gray-300 text-gray-700 text-xs rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-1.5"
                 >
                   <option value={10}>10</option>
@@ -408,7 +503,6 @@ export default function MasterPemeriksaan() {
               </div>
             </div>
 
-            {/* Bagian Kanan: Navigasi Page */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
@@ -418,39 +512,10 @@ export default function MasterPemeriksaan() {
                 <ChevronLeft size={16} />
               </button>
 
-              {/* Logic Page Indicator (Keep Simple or Full) */}
-              <div className="flex gap-1 hidden sm:flex">
-                {[...Array(totalPages)].map((_, i) => {
-                  // Logic agar tidak menampilkan semua angka jika halamannya banyak
-                  if (
-                    totalPages > 5 &&
-                    i !== 0 &&
-                    i !== totalPages - 1 &&
-                    (i < currentPage - 2 || i > currentPage)
-                  ) {
-                    if (i === currentPage - 3 || i === currentPage + 1)
-                      return (
-                        <span key={i} className="px-1 text-gray-400">
-                          .
-                        </span>
-                      );
-                    return null;
-                  }
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => setCurrentPage(i + 1)}
-                      className={`w-8 h-8 rounded-lg text-xs font-medium transition-all ${
-                        currentPage === i + 1
-                          ? "bg-cyan-600 text-white shadow-md shadow-cyan-200"
-                          : "text-gray-600 hover:bg-gray-200"
-                      }`}
-                    >
-                      {i + 1}
-                    </button>
-                  );
-                })}
-              </div>
+              {/* Simple Page Indicator */}
+              <span className="text-sm font-medium text-gray-600 px-2">
+                Halaman {currentPage}
+              </span>
 
               <button
                 onClick={() =>
@@ -469,9 +534,15 @@ export default function MasterPemeriksaan() {
       {/* --- MODAL FORM --- */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h3 className="font-bold text-lg text-gray-800">
+              <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
+                {isEditing ? (
+                  <Edit2 size={18} className="text-cyan-600" />
+                ) : (
+                  <Plus size={18} className="text-cyan-600" />
+                )}
                 {isEditing ? "Edit Data Pemeriksaan" : "Tambah Data Baru"}
               </h3>
               <button
@@ -482,81 +553,114 @@ export default function MasterPemeriksaan() {
               </button>
             </div>
 
+            {/* Modal Body */}
             <div className="overflow-y-auto p-6 custom-scrollbar">
               <form
                 id="masterForm"
                 onSubmit={handleSubmit}
-                className="space-y-5"
+                className="space-y-6"
               >
-                {/* Kategori Input */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <Tag size={16} className="text-cyan-600" /> Kategori
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      list="kategori-list"
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all text-sm"
-                      value={formData.kategori}
-                      onChange={(e) =>
-                        setFormData({ ...formData, kategori: e.target.value })
-                      }
-                      placeholder="Pilih atau ketik kategori baru..."
-                    />
-                    <datalist id="kategori-list">
-                      {categories
-                        .filter((c) => c !== "Semua")
-                        .map((cat) => (
-                          <option key={cat} value={cat} />
-                        ))}
-                    </datalist>
-                  </div>
-                  <p className="text-[10px] text-gray-400 ml-1">
-                    Tips: Ketik nama kategori baru untuk menambah grup baru.
-                  </p>
-                </div>
-
-                {/* Nama Pemeriksaan */}
-                <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <Beaker size={16} className="text-cyan-600" /> Nama
-                    Pemeriksaan
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all text-sm"
-                    value={formData.nama_pemeriksaan}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        nama_pemeriksaan: e.target.value,
-                      })
-                    }
-                    placeholder="Contoh: Glukosa Puasa"
-                  />
-                </div>
-
+                {/* 1. Selection Tipe (Logic Baru dengan Style Lama) */}
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Satuan */}
+                  <div
+                    onClick={() =>
+                      setFormData({ ...formData, tipe: "tunggal" })
+                    }
+                    className={`cursor-pointer border rounded-xl p-4 flex items-center gap-3 transition-all ${
+                      formData.tipe === "tunggal"
+                        ? "bg-cyan-50 border-cyan-500 ring-1 ring-cyan-500"
+                        : "bg-white border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    <div
+                      className={`p-2 rounded-full ${
+                        formData.tipe === "tunggal"
+                          ? "bg-cyan-200 text-cyan-700"
+                          : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      <FileText size={20} />
+                    </div>
+                    <div>
+                      <p
+                        className={`font-bold text-sm ${
+                          formData.tipe === "tunggal"
+                            ? "text-cyan-800"
+                            : "text-gray-700"
+                        }`}
+                      >
+                        Pemeriksaan Tunggal
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Satu jenis parameter hasil
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => setFormData({ ...formData, tipe: "paket" })}
+                    className={`cursor-pointer border rounded-xl p-4 flex items-center gap-3 transition-all ${
+                      formData.tipe === "paket"
+                        ? "bg-purple-50 border-purple-500 ring-1 ring-purple-500"
+                        : "bg-white border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    <div
+                      className={`p-2 rounded-full ${
+                        formData.tipe === "paket"
+                          ? "bg-purple-200 text-purple-700"
+                          : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      <Package size={20} />
+                    </div>
+                    <div>
+                      <p
+                        className={`font-bold text-sm ${
+                          formData.tipe === "paket"
+                            ? "text-purple-800"
+                            : "text-gray-700"
+                        }`}
+                      >
+                        Paket Pemeriksaan
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Terdiri dari banyak parameter
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="h-px bg-gray-100 w-full"></div>
+
+                {/* 2. Common Fields (Nama, Kategori, Harga) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                      <Scale size={16} className="text-cyan-600" /> Satuan
+                      <Tag size={16} className="text-cyan-600" /> Kategori
                     </label>
-                    <input
-                      type="text"
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all text-sm"
-                      value={formData.satuan}
-                      onChange={(e) =>
-                        setFormData({ ...formData, satuan: e.target.value })
-                      }
-                      placeholder="mg/dL"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        list="kategori-list"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all text-sm"
+                        value={formData.kategori}
+                        onChange={(e) =>
+                          setFormData({ ...formData, kategori: e.target.value })
+                        }
+                        placeholder="Pilih atau ketik..."
+                      />
+                      <datalist id="kategori-list">
+                        {categories
+                          .filter((c) => c !== "Semua")
+                          .map((cat) => (
+                            <option key={cat} value={cat} />
+                          ))}
+                      </datalist>
+                    </div>
                   </div>
 
-                  {/* Harga (AUTO FORMAT RIBUAN) */}
                   <div className="space-y-1.5">
                     <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                       <DollarSign size={16} className="text-cyan-600" /> Harga
@@ -573,9 +677,199 @@ export default function MasterPemeriksaan() {
                     />
                   </div>
                 </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Beaker size={16} className="text-cyan-600" /> Nama
+                    Pemeriksaan
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all text-sm"
+                    value={formData.nama_pemeriksaan}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        nama_pemeriksaan: e.target.value,
+                      })
+                    }
+                    placeholder={
+                      formData.tipe === "paket"
+                        ? "Contoh: Paket Medical Checkup A"
+                        : "Contoh: Glukosa Puasa"
+                    }
+                  />
+                </div>
+
+                {/* 3. Conditional Rendering based on Tipe */}
+                {formData.tipe === "tunggal" ? (
+                  /* --- Form Tunggal --- */
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in">
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <Scale size={16} className="text-cyan-600" /> Satuan
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all text-sm"
+                        value={formData.satuan}
+                        onChange={(e) =>
+                          setFormData({ ...formData, satuan: e.target.value })
+                        }
+                        placeholder="mg/dL"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <Activity size={16} className="text-cyan-600" /> Nilai
+                        Rujukan
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all text-sm"
+                        value={formData.nilai_rujukan}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            nilai_rujukan: e.target.value,
+                          })
+                        }
+                        placeholder="< 200"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <ClipboardList size={16} className="text-cyan-600" />{" "}
+                        Metode
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 outline-none transition-all text-sm"
+                        value={formData.metode}
+                        onChange={(e) =>
+                          setFormData({ ...formData, metode: e.target.value })
+                        }
+                        placeholder="Hexokinase"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* --- Form Paket (Dynamic Parameters) --- */
+                  <div className="space-y-3 animate-fade-in bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    {/* HILANGKAN INPUT SATUAN/NILAI_RUJUKAN/METODE LEVEL MASTER UNTUK PAKET */}
+                    <p className="text-xs text-gray-500 mb-3">
+                      Untuk pemeriksaan paket, satuan, nilai rujukan, dan metode
+                      diatur per parameter di bawah.
+                    </p>
+
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                        <Package size={16} className="text-purple-600" /> Daftar
+                        Parameter Paket
+                      </label>
+                      <button
+                        type="button"
+                        onClick={addParameter}
+                        className="text-xs flex items-center gap-1 bg-purple-100 text-purple-700 px-3 py-1.5 rounded-lg hover:bg-purple-200 font-medium transition"
+                      >
+                        <Plus size={12} /> Tambah Parameter
+                      </button>
+                    </div>
+
+                    {parameters.length === 0 ? (
+                      <div className="text-center py-6 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg bg-white">
+                        <p className="text-sm">Belum ada parameter.</p>
+                        <button
+                          type="button"
+                          onClick={addParameter}
+                          className="text-xs text-purple-600 underline mt-1"
+                        >
+                          Klik untuk tambah
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                        {parameters.map((param, index) => (
+                          <div
+                            key={index}
+                            className="flex flex-col gap-2 p-3 bg-white rounded-lg border border-gray-200 shadow-sm relative group"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => removeParameter(index)}
+                              className="absolute top-2 right-2 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-md transition"
+                            >
+                              <Minus size={14} />
+                            </button>
+
+                            <div className="pr-8">
+                              <input
+                                type="text"
+                                placeholder="Nama Parameter (Wajib)"
+                                className="w-full px-3 py-2 text-sm border-b border-gray-200 focus:border-purple-500 outline-none font-medium mb-2"
+                                value={param.parameter_name}
+                                onChange={(e) =>
+                                  updateParameter(
+                                    index,
+                                    "parameter_name",
+                                    e.target.value
+                                  )
+                                }
+                                required
+                              />
+                              <div className="grid grid-cols-3 gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Satuan"
+                                  className="px-3 py-1.5 text-xs bg-gray-50 rounded border border-gray-200 focus:border-purple-300 outline-none"
+                                  value={param.satuan}
+                                  onChange={(e) =>
+                                    updateParameter(
+                                      index,
+                                      "satuan",
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Nilai Rujukan"
+                                  className="px-3 py-1.5 text-xs bg-gray-50 rounded border border-gray-200 focus:border-purple-300 outline-none"
+                                  value={param.nilai_rujukan}
+                                  onChange={(e) =>
+                                    updateParameter(
+                                      index,
+                                      "nilai_rujukan",
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Metode"
+                                  className="px-3 py-1.5 text-xs bg-gray-50 rounded border border-gray-200 focus:border-purple-300 outline-none"
+                                  value={param.metode}
+                                  onChange={(e) =>
+                                    updateParameter(
+                                      index,
+                                      "metode",
+                                      e.target.value
+                                    )
+                                  }
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </form>
             </div>
 
+            {/* Modal Footer */}
             <div className="p-6 border-t border-gray-100 flex gap-3 bg-gray-50/50">
               <button
                 type="button"
@@ -588,14 +882,18 @@ export default function MasterPemeriksaan() {
                 type="submit"
                 form="masterForm"
                 disabled={submitLoading}
-                className="flex-1 py-3 rounded-xl bg-linear-to-r from-cyan-600 to-blue-600 text-white font-bold hover:shadow-lg hover:shadow-cyan-200 transition flex items-center justify-center gap-2"
+                className={`flex-1 py-3 rounded-xl text-white font-bold hover:shadow-lg transition flex items-center justify-center gap-2 ${
+                  formData.tipe === "paket"
+                    ? "bg-linear-to-r from-purple-600 to-indigo-600 hover:shadow-purple-200"
+                    : "bg-linear-to-r from-cyan-600 to-blue-600 hover:shadow-cyan-200"
+                }`}
               >
                 {submitLoading ? (
                   <Loader2 className="animate-spin" size={18} />
                 ) : (
                   <Save size={18} />
                 )}
-                Simpan Data
+                Simpan {formData.tipe === "paket" ? "Paket" : "Data"}
               </button>
             </div>
           </div>
