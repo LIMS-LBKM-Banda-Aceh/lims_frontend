@@ -33,45 +33,52 @@ export default function ResultInputModal({
     fetchTests();
   }, [registrationId]);
 
-  // Handler untuk mengubah state lokal saja (TANPA request API otomatis)
+  // Handler untuk mengubah state lokal saja
   const handleInputChange = (testId, value) => {
     setTests((prev) =>
       prev.map((t) => (t.id === testId ? { ...t, nilai: value } : t))
     );
   };
 
-  // Logic BARU: Simpan semua data sekaligus saat tombol ditekan
+  // Logic UPDATED: Validasi Strict & Konfirmasi
   const handleSaveAll = async () => {
+    // 1. Validasi: Filter item yang nilainya masih kosong/null/undefined
+    const emptyTests = tests.filter(
+      (t) => !t.nilai || t.nilai.toString().trim() === ""
+    );
+
+    // Jika ada list yang kosong, tolak simpan
+    if (emptyTests.length > 0) {
+      // Kita bisa sebutkan parameter mana yang belum diisi agar user aware
+      const missingParams = emptyTests.map((t) => t.parameter_name).join(", ");
+      toast.warn(`Harap lengkapi nilai untuk: ${missingParams}`);
+      return; // STOP execution here
+    }
+
+    // 2. Konfirmasi: Tanya user sebelum menembak API
+    // Menggunakan window.confirm (native) agar tidak perlu library tambahan
+    const isConfirmed = window.confirm(
+      `Apakah Anda yakin ingin menyimpan ${tests.length} hasil tes ini? \n\nPastikan data sudah benar karena akan diverifikasi.`
+    );
+
+    if (!isConfirmed) {
+      return; // STOP execution jika user klik Cancel
+    }
+
+    // --- Mulai Proses Simpan (Logic Asli tetap dipertahankan) ---
     try {
       setSaving(true);
 
-      // 1. Validasi sederhana: Pastikan minimal ada satu yang diisi atau validasi sesuai kebutuhan
-      const hasValue = tests.some(
-        (t) => t.nilai && t.nilai.toString().trim() !== ""
-      );
-      if (!hasValue) {
-        toast.warning("Belum ada hasil yang diinput.");
-        setSaving(false);
-        return;
-      }
-
-      // 2. Buat array of promises untuk request API secara paralel
-      // Kita hanya mengirim data yang memiliki nilai agar efisien (opsional, bisa juga kirim semua)
       const savePromises = tests.map((test) => {
-        // Jika nilai kosong, mungkin kita skip atau tetap kirim string kosong tergantung logic backend
-        // Di sini saya asumsikan kita kirim update untuk semua row yang ada di modal
         return api.put(`/tests/${test.id}/result`, { nilai: test.nilai || "" });
       });
 
-      // 3. Jalankan semua request
       await Promise.all(savePromises);
 
-      // 4. Update status lokal visual (opsional, karena modal akan ditutup)
       setTests((prev) => prev.map((t) => ({ ...t, status: "completed" })));
 
       toast.success("Semua hasil berhasil disimpan & disinkronisasi!");
 
-      // 5. Tutup modal & refresh data di parent
       onClose();
     } catch (e) {
       console.error("Error batch saving:", e);
@@ -122,49 +129,61 @@ export default function ResultInputModal({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {tests.map((test) => (
-                  <tr
-                    key={test.id}
-                    className="hover:bg-gray-50/50 transition-colors"
-                  >
-                    <td className="py-3 pl-2 font-medium text-gray-700">
-                      {test.parameter_name}
-                    </td>
-                    <td className="py-3 text-gray-500 text-xs">
-                      {test.metode || "-"}
-                    </td>
-                    <td className="py-3 text-gray-500 text-xs">
-                      {test.nilai_rujukan || test.range_normal || "-"}
-                    </td>
-                    <td className="py-3">
-                      {/* INPUT PERUBAHAN DI SINI */}
-                      <input
-                        type="text"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"
-                        value={test.nilai || ""}
-                        // Hapus onBlur (auto save)
-                        // Gunakan onChange hanya untuk update state lokal
-                        onChange={(e) =>
-                          handleInputChange(test.id, e.target.value)
-                        }
-                        placeholder="Input hasil..."
-                        disabled={saving}
-                      />
-                    </td>
-                    <td className="py-3 text-gray-500">{test.satuan}</td>
-                    <td className="py-3">
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          test.status === "completed"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {test.status === "completed" ? "Selesai" : "Draft"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {tests.map((test) => {
+                  // Visual helper: cek apakah field ini kosong saat user mencoba save (opsional, tapi bagus untuk UX)
+                  const isEmpty =
+                    !test.nilai || test.nilai.toString().trim() === "";
+
+                  return (
+                    <tr
+                      key={test.id}
+                      className="hover:bg-gray-50/50 transition-colors"
+                    >
+                      <td className="py-3 pl-2 font-medium text-gray-700">
+                        {test.parameter_name}
+                      </td>
+                      <td className="py-3 text-gray-500 text-xs text-center">
+                        {test.metode || "-"}
+                      </td>
+                      <td className="py-3 text-gray-500 text-xs">
+                        {test.nilai_rujukan || test.range_normal || "-"}
+                      </td>
+                      <td className="py-3">
+                        <input
+                          type="text"
+                          // Tambahkan visual error (border merah) jika kosong (opsional UX improvement)
+                          className={`w-full border rounded-lg px-3 py-2 outline-none transition-all ${
+                            // Logic styling: bisa dikembangkan nanti,
+                            // saat ini kita pertahankan style default, fokus ke logic save
+                            "border-gray-300 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+                          }`}
+                          value={test.nilai || ""}
+                          onChange={(e) =>
+                            handleInputChange(test.id, e.target.value)
+                          }
+                          placeholder="Input hasil..."
+                          disabled={saving}
+                          // Tambahkan atribut required secara HTML5 juga sebagai double protection (visual only)
+                          required
+                        />
+                      </td>
+                      <td className="py-3 text-gray-500 text-center">
+                        {test.satuan}
+                      </td>
+                      <td className="py-3">
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            test.status === "completed"
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {test.status === "completed" ? "Selesai" : "Draft"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
@@ -173,7 +192,7 @@ export default function ResultInputModal({
         {/* Footer Actions */}
         <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center">
           <div className="text-xs text-gray-500 italic">
-            *Pastikan semua data benar sebelum menyimpan.
+            *Semua kolom hasil wajib diisi.
           </div>
           <div className="flex gap-3">
             <button

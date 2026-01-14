@@ -10,7 +10,7 @@ import {
   CheckCircle2,
   FileText,
   Calendar,
-  X, 
+  X,
   Eye,
 } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -104,36 +104,148 @@ export default function DataManagement({ onRefreshStats }) {
   };
 
   // --- Logic Export Excel ---
+  // Pastikan import XLSX ada di atas
+  // import * as XLSX from "xlsx";
+
   const exportToExcel = () => {
-    if (data.length === 0) {
+    if (filteredData.length === 0) {
       toast.warn("Tidak ada data untuk diexport");
       return;
     }
 
-    const dataToExport = filteredData.map((item) => ({
-      "No. Registrasi": item.no_reg,
-      "No. Sampel Lab": item.no_sampel_lab,
-      "Tanggal Daftar": new Date(item.tgl_daftar).toLocaleDateString("id-ID"),
-      "Waktu Daftar": item.waktu_daftar,
-      "Nama Pasien": item.nama_pasien,
-      NIK: item.nik,
-      "Jenis Kelamin": item.jenis_kelamin,
-      "Jenis Pemeriksaan": item.jenis_pemeriksaan,
-      Status: item.status,
-    }));
+    // 1. PREPARASI DATA (FLATTENING)
+    // Kita olah dulu datanya menjadi array objek datar
+    const rawRows = [];
 
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    filteredData.forEach((item, index) => {
+      // Base info yang akan selalu ada
+      const baseInfo = {
+        No: index + 1, // Penomoran
+        "No. Registrasi": item.no_reg,
+        "No. Sampel": item.no_sampel_lab || "-",
+        "Tanggal Daftar": new Date(item.tgl_daftar).toLocaleDateString("id-ID"),
+        "Nama Pasien": item.nama_pasien,
+        NIK: item.nik ? `'${item.nik}` : "-",
+        JK: item.jenis_kelamin,
+        Umur: `${item.umur} Th`,
+        Alamat: item.alamat || "-",
+        Pengirim: item.pengirim_instansi || "Mandiri",
+        "Asal Sampel": item.asal_sampel,
+        "Status Pengerjaan": item.status.replace("_", " ").toUpperCase(),
+        Catatan: item.catatan_tambahan || "-",
+      };
+
+      // Cek Rincian Tes
+      const rincianTes = item.details || item.tests || [];
+
+      if (rincianTes.length > 0) {
+        // Jika ada rincian, kita buat baris per parameter uji
+        rincianTes.forEach((tes) => {
+          rawRows.push({
+            ...baseInfo,
+            "Parameter Uji": tes.nama_pemeriksaan || tes.parameter_name,
+            Hasil: tes.nilai || tes.result || "Belum ada",
+            Satuan: tes.satuan || "-",
+            "Nilai Rujukan": tes.nilai_rujukan || "-",
+            Metode: tes.metode || "-",
+          });
+        });
+      } else {
+        // Jika tidak ada rincian, tampilkan summary jenis pemeriksaan
+        rawRows.push({
+          ...baseInfo,
+          "Parameter Uji": item.jenis_pemeriksaan, // Summary string
+          Hasil: "-",
+          Satuan: "-",
+          "Nilai Rujukan": "-",
+          Metode: "-",
+        });
+      }
+    });
+
+    // 2. MEMBUAT STRUKTUR REPORT (HEADER & METADATA)
+    // Kita tidak langsung convert JSON, tapi kita bangun Array of Arrays secara manual
+
+    // A. Judul Laporan (Akan di-merge nanti)
+    const reportTitle = [["LAPORAN DATA PEMERIKSAAN LABORATORIUM (LIMS)"]];
+    const reportSubtitle = [["BALAI LABORATORIUM KESEHATAN MASYARAKAT BANDA ACEH"]];
+
+    // B. Metadata Export
+    const exportDate = new Date().toLocaleDateString("id-ID", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const exportTime = new Date().toLocaleTimeString("id-ID");
+    const metadata = [
+      ["Tanggal Export:", `${exportDate} Pukul ${exportTime}`],
+      ["Total Data:", `${rawRows.length} Baris Data`],
+      ["Filter Pencarian:", searchTerm ? `'${searchTerm}'` : "Semua Data"],
+      [""], // Spasi kosong sebelum tabel
+    ];
+
+    // C. Header Tabel
+    // Ambil keys dari row pertama sebagai header
+    const tableHeaders = Object.keys(rawRows[0]);
+
+    // D. Body Tabel (Convert Object values ke Array)
+    const tableBody = rawRows.map((row) => Object.values(row));
+
+    // E. Gabungkan Semua Menjadi Satu Master Array
+    const finalData = [
+      ...reportTitle,
+      ...reportSubtitle,
+      [""], // Spasi
+      ...metadata,
+      tableHeaders, // Baris Header Tabel
+      ...tableBody, // Baris Data Tabel
+    ];
+
+    // 3. MEMBUAT WORKSHEET
+    const worksheet = XLSX.utils.aoa_to_sheet(finalData);
+
+    // 4. STYLING LAYOUT (MERGES & WIDTH)
+
+    // A. Merge Cells untuk Judul (Agar rata tengah secara visual nanti)
+    // s = start, e = end, r = row, c = col (0-indexed)
+    // Merge baris 0 (Judul) dari kolom A sampai kolom terakhir
+    worksheet["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: tableHeaders.length - 1 } }, // Judul Utama
+      { s: { r: 1, c: 0 }, e: { r: 1, c: tableHeaders.length - 1 } }, // Sub Judul
+    ];
+
+    // B. Auto-Width Columns
+    // Menghitung lebar maksimal per kolom berdasarkan konten
+    const colWidths = tableHeaders.map((header, colIndex) => {
+      // Ambil panjang text header
+      let maxLength = header.length;
+
+      // Cek panjang text di 20 baris pertama data (sample) agar performa tidak berat
+      for (let i = 0; i < Math.min(tableBody.length, 20); i++) {
+        const cellValue = tableBody[i][colIndex]
+          ? String(tableBody[i][colIndex])
+          : "";
+        if (cellValue.length > maxLength) {
+          maxLength = cellValue.length;
+        }
+      }
+      // Buffer +2 char
+      return { wch: maxLength + 5 };
+    });
+
+    worksheet["!cols"] = colWidths;
+
+    // 5. GENERATE FILE
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan LIMS");
 
-    const wscols = Object.keys(dataToExport[0]).map(() => ({ wch: 20 }));
-    worksheet["!cols"] = wscols;
+    const fileName = `Laporan_LIMS_${new Date()
+      .toISOString()
+      .slice(0, 10)}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
 
-    XLSX.writeFile(
-      workbook,
-      `Laporan_LIMS_${new Date().toISOString().slice(0, 10)}.xlsx`
-    );
-    toast.success("Data berhasil diexport.");
+    toast.success("Laporan berhasil didownload");
   };
 
   // --- Logic Print LHU ---
@@ -439,7 +551,7 @@ export default function DataManagement({ onRefreshStats }) {
               <button
                 onClick={handleApprove}
                 disabled={processingAcc}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold hover:shadow-lg hover:shadow-green-200 transition flex items-center gap-2 disabled:opacity-70"
+                className="px-6 py-2.5 rounded-xl bg-linear-to-r from-green-600 to-emerald-600 text-white font-bold hover:shadow-lg hover:shadow-green-200 transition flex items-center gap-2 disabled:opacity-70"
               >
                 {processingAcc ? (
                   <>
