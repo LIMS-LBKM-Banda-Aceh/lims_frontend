@@ -27,42 +27,46 @@ export default function LHUPrintTemplate({ data }) {
         <table>
           <tbody>
             <tr>
-              <td className="w-32 py-1">Dokter Pengirim</td>
-              <td>: {data.dokter_pengirim || "-"}</td>
+              <td className="py-1">Nama Pasien</td>
+              <td>
+                : <b>{data.nama_pasien}</b>
+              </td>
+            </tr>
+            <tr>
+              <td className="w-32 py-1">Tanggal Lahir</td>
+              <td>: {new Date(data.tgl_lahir).toLocaleDateString("id-ID")}</td>
+            </tr>
+            <tr>
+              <td className="w-32 py-1">NIK</td>
+              <td>: {data.nik || "-"}</td>
             </tr>
             <tr>
               <td className="py-1">Alamat</td>
               <td>: {data.alamat || "-"}</td>
             </tr>
             <tr>
-              <td className="py-1">No. Rekam Medik</td>
-              <td>: {data.nik || "-"}</td>
-            </tr>
-            <tr>
-              <td className="py-1">Nama Pasien</td>
-              <td>
-                : <b>{data.nama_pasien}</b>
-              </td>
+              <td className="py-1">No. HP/Telepon</td>
+              <td>: {data.no_kontak || "-"}</td>
             </tr>
           </tbody>
         </table>
         <table>
           <tbody>
             <tr>
-              <td className="w-32 py-1">Tanggal Lahir</td>
-              <td>: {new Date(data.tgl_lahir).toLocaleDateString("id-ID")}</td>
-            </tr>
-            <tr>
               <td className="py-1">No. Registrasi</td>
               <td>: {data.no_reg}</td>
+            </tr>
+            <tr>
+              <td className="py-1">Tanggal daftar</td>
+              <td>: {data.tgl_daftar}</td>
             </tr>
             <tr>
               <td className="py-1">Kode Lab</td>
               <td>: {data.no_sampel_lab}</td>
             </tr>
             <tr>
-              <td className="py-1">Waktu Sampling</td>
-              <td>: {data.waktu_sampling} WIB</td>
+              <td className="py-1">Waktu Daftar</td>
+              <td>: {data.waktu_daftar} WIB</td>
             </tr>
           </tbody>
         </table>

@@ -23,6 +23,7 @@ import {
   Minus,
   Activity,
   ClipboardList,
+  AlertCircle,
 } from "lucide-react";
 
 export default function MasterPemeriksaan() {
@@ -45,14 +46,13 @@ export default function MasterPemeriksaan() {
   const [isEditing, setIsEditing] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
 
-  // Form Data (Gabungan Logic Baru ke dalam State Lama)
+  // Form Data
   const [formData, setFormData] = useState({
     id: null,
-    tipe: "tunggal", // 'tunggal' | 'paket'
+    tipe: "tunggal",
     kategori: "",
     nama_pemeriksaan: "",
     harga: "",
-    // Field khusus Tunggal
     satuan: "",
     nilai_rujukan: "",
     metode: "",
@@ -80,7 +80,7 @@ export default function MasterPemeriksaan() {
     }
   };
 
-  // --- LOGIC: FILTER & SORTING (Sama seperti kode lama) ---
+  // --- LOGIC: FILTER & SORTING ---
   const categories = useMemo(() => {
     const cats = data.map((item) => item.kategori).filter(Boolean);
     return ["Semua", ...new Set(cats)];
@@ -98,13 +98,15 @@ export default function MasterPemeriksaan() {
       filtered = filtered.filter(
         (item) =>
           item.nama_pemeriksaan.toLowerCase().includes(lowerTerm) ||
-          item.kategori.toLowerCase().includes(lowerTerm)
+          item.kategori.toLowerCase().includes(lowerTerm) ||
+          (item.metode && item.metode.toLowerCase().includes(lowerTerm)) ||
+          (item.nilai_rujukan &&
+            item.nilai_rujukan.toLowerCase().includes(lowerTerm))
       );
     }
 
     if (sortConfig.key) {
       filtered.sort((a, b) => {
-        // Handle sorting for possibly nested or missing keys safely
         const valA = a[sortConfig.key] || "";
         const valB = b[sortConfig.key] || "";
 
@@ -141,7 +143,7 @@ export default function MasterPemeriksaan() {
       minimumFractionDigits: 0,
     }).format(num);
 
-  // --- HANDLERS PARAMETER (LOGIC BARU) ---
+  // --- HANDLERS PARAMETER ---
   const addParameter = () => {
     setParameters([
       ...parameters,
@@ -188,9 +190,7 @@ export default function MasterPemeriksaan() {
   };
 
   const handleEdit = async (item) => {
-    // 1. Tampilkan loading sebentar (opsional) atau langsung fetch
     try {
-      // Kita ambil data detail yang LENGKAP dari backend (termasuk array parameters)
       const res = await api.get(`/master/pemeriksaan/${item.id}/detail`);
 
       if (res.data.success) {
@@ -198,7 +198,6 @@ export default function MasterPemeriksaan() {
 
         setIsEditing(true);
 
-        // 2. Set Form Data Utama
         setFormData({
           id: fullData.id,
           tipe: fullData.tipe || "tunggal",
@@ -210,15 +209,12 @@ export default function MasterPemeriksaan() {
           metode: fullData.metode || "",
         });
 
-        // 3. Set Parameters (Ini kuncinya)
-        // Backend kamu mengembalikan array parameters di sini
         if (fullData.tipe === "paket" && fullData.parameters) {
           setParameters(fullData.parameters);
         } else {
           setParameters([]);
         }
 
-        // 4. Buka Modal
         setShowModal(true);
       }
     } catch (error) {
@@ -239,20 +235,15 @@ export default function MasterPemeriksaan() {
     }
   };
 
-  // MasterPemeriksaan.jsx - FUNGSI YANG BENAR (PENGGANTI)
-  // MasterPemeriksaan.jsx
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitLoading(true);
 
-    // Persiapan Payload
     const payload = {
       ...formData,
       parameters: formData.tipe === "paket" ? parameters : [],
     };
 
-    // Validasi Paket
     if (formData.tipe === "paket") {
       if (parameters.length === 0) {
         toast.error("Paket pemeriksaan harus memiliki minimal 1 parameter");
@@ -263,27 +254,62 @@ export default function MasterPemeriksaan() {
 
     try {
       if (isEditing) {
-        // PERBAIKAN DISINI: Tambahkan '/with-parameters' pada URL
         await api.put(
           `/master/pemeriksaan/${formData.id}/with-parameters`,
           payload
         );
         toast.success("Data berhasil diperbarui");
       } else {
-        // Create juga menggunakan endpoint with-parameters
         await api.post("/master/pemeriksaan/with-parameters", payload);
         toast.success("Data berhasil ditambahkan");
       }
       setShowModal(false);
       fetchData();
     } catch (error) {
-      console.error(error); // Log error agar terlihat di console
+      console.error(error);
       toast.error(
         error.response?.data?.message || "Terjadi kesalahan saat menyimpan"
       );
     } finally {
       setSubmitLoading(false);
     }
+  };
+
+  // --- RENDER NILAI RUJUKAN & METODE DI TABEL ---
+  const renderNilaiRujukan = (item) => {
+    if (item.tipe === "paket") {
+      return (
+        <div className="flex items-center gap-1 text-gray-400">
+          <Package size={12} />
+          <span className="text-xs italic">Multi nilai</span>
+        </div>
+      );
+    }
+    return item.nilai_rujukan ? (
+      <div className="max-w-[200px]">
+        <span className="text-sm text-gray-700 line-clamp-2">
+          {item.nilai_rujukan}
+        </span>
+      </div>
+    ) : (
+      <span className="text-gray-400 text-sm">-</span>
+    );
+  };
+
+  const renderMetode = (item) => {
+    if (item.tipe === "paket") {
+      return (
+        <div className="flex items-center gap-1 text-gray-400">
+          <AlertCircle size={12} />
+          <span className="text-xs italic">Beragam</span>
+        </div>
+      );
+    }
+    return item.metode ? (
+      <span className="text-sm text-gray-700">{item.metode}</span>
+    ) : (
+      <span className="text-gray-400 text-sm">-</span>
+    );
   };
 
   return (
@@ -317,7 +343,7 @@ export default function MasterPemeriksaan() {
             />
             <input
               type="text"
-              placeholder="Cari nama pemeriksaan atau kategori..."
+              placeholder="Cari nama pemeriksaan, kategori, metode, atau nilai rujukan..."
               className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm transition-all"
               value={searchTerm}
               onChange={(e) => {
@@ -356,7 +382,7 @@ export default function MasterPemeriksaan() {
             <thead className="bg-gray-50/80 text-gray-600 font-semibold border-b border-gray-200">
               <tr>
                 <th
-                  className="px-6 py-4 cursor-pointer hover:bg-gray-100 transition-colors group"
+                  className="px-6 py-4 cursor-pointer hover:bg-gray-100 transition-colors group min-w-[220px]"
                   onClick={() => handleSort("nama_pemeriksaan")}
                 >
                   <div className="flex items-center gap-2">
@@ -367,9 +393,9 @@ export default function MasterPemeriksaan() {
                     />
                   </div>
                 </th>
-                <th className="px-6 py-4">Tipe</th>
+                <th className="px-6 py-4 min-w-[100px]">Tipe</th>
                 <th
-                  className="px-6 py-4 cursor-pointer hover:bg-gray-100 transition-colors group"
+                  className="px-6 py-4 cursor-pointer hover:bg-gray-100 transition-colors group min-w-[120px]"
                   onClick={() => handleSort("kategori")}
                 >
                   <div className="flex items-center gap-2">
@@ -380,9 +406,11 @@ export default function MasterPemeriksaan() {
                     />
                   </div>
                 </th>
-                <th className="px-6 py-4">Satuan / Info</th>
+                <th className="px-6 py-4 min-w-[120px]">Satuan / Info</th>
+                <th className="px-6 py-4 min-w-[180px]">Nilai Rujukan</th>
+                <th className="px-6 py-4 min-w-[150px]">Metode</th>
                 <th
-                  className="px-6 py-4 cursor-pointer hover:bg-gray-100 transition-colors group"
+                  className="px-6 py-4 cursor-pointer hover:bg-gray-100 transition-colors group min-w-[140px]"
                   onClick={() => handleSort("harga")}
                 >
                   <div className="flex items-center gap-2">
@@ -393,14 +421,14 @@ export default function MasterPemeriksaan() {
                     />
                   </div>
                 </th>
-                <th className="px-6 py-4 text-center">Aksi</th>
+                <th className="px-6 py-4 text-center min-w-[100px]">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr>
                   <td
-                    colSpan="6"
+                    colSpan="8"
                     className="text-center py-12 text-gray-400 flex flex-col items-center"
                   >
                     <Loader2 className="animate-spin mb-2" /> Memuat data...
@@ -408,7 +436,7 @@ export default function MasterPemeriksaan() {
                 </tr>
               ) : currentItems.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="text-center py-12 text-gray-400">
+                  <td colSpan="8" className="text-center py-12 text-gray-400">
                     Tidak ada data ditemukan.
                   </td>
                 </tr>
@@ -418,8 +446,10 @@ export default function MasterPemeriksaan() {
                     key={item.id}
                     className="hover:bg-cyan-50/30 transition-colors"
                   >
-                    <td className="px-6 py-4 font-bold text-gray-800">
-                      {item.nama_pemeriksaan}
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-gray-800">
+                        {item.nama_pemeriksaan}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       {item.tipe === "paket" ? (
@@ -437,18 +467,32 @@ export default function MasterPemeriksaan() {
                         {item.kategori}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-500">
+                    <td className="px-6 py-4">
                       {item.tipe === "paket" ? (
-                        <span className="italic text-gray-400 text-xs">
-                          {/* Ganti item.parameters?.length menjadi item.total_parameters */}
-                          {item.total_parameters || 0} parameter
-                        </span>
+                        <div className="flex flex-col">
+                          <span className="text-gray-500 text-sm">
+                            {item.total_parameters || 0} parameter
+                          </span>
+                        </div>
                       ) : (
-                        item.satuan || "-"
+                        <div>
+                          <div className="flex items-center gap-1 text-gray-700">
+                            <Scale size={12} />
+                            <span className="text-sm">{item.satuan || "-"}</span>
+                          </div>
+                        </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 font-mono font-medium text-cyan-700">
-                      {formatRupiahDisplay(item.harga)}
+                    <td className="px-6 py-4">
+                      {renderNilaiRujukan(item)}
+                    </td>
+                    <td className="px-6 py-4">
+                      {renderMetode(item)}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-mono font-medium text-cyan-700">
+                        {formatRupiahDisplay(item.harga)}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-center gap-2">
@@ -512,7 +556,6 @@ export default function MasterPemeriksaan() {
                 <ChevronLeft size={16} />
               </button>
 
-              {/* Simple Page Indicator */}
               <span className="text-sm font-medium text-gray-600 px-2">
                 Halaman {currentPage}
               </span>
@@ -560,7 +603,7 @@ export default function MasterPemeriksaan() {
                 onSubmit={handleSubmit}
                 className="space-y-6"
               >
-                {/* 1. Selection Tipe (Logic Baru dengan Style Lama) */}
+                {/* 1. Selection Tipe */}
                 <div className="grid grid-cols-2 gap-4">
                   <div
                     onClick={() =>
@@ -757,7 +800,6 @@ export default function MasterPemeriksaan() {
                 ) : (
                   /* --- Form Paket (Dynamic Parameters) --- */
                   <div className="space-y-3 animate-fade-in bg-gray-50 p-4 rounded-xl border border-gray-200">
-                    {/* HILANGKAN INPUT SATUAN/NILAI_RUJUKAN/METODE LEVEL MASTER UNTUK PAKET */}
                     <p className="text-xs text-gray-500 mb-3">
                       Untuk pemeriksaan paket, satuan, nilai rujukan, dan metode
                       diatur per parameter di bawah.
