@@ -1,15 +1,39 @@
 // src/components/LHUPrintTemplate.jsx
+
 import React from "react";
+import kopMailImg from "../assets/kop_mail.png";
 
 export default function LHUPrintTemplate({ data }) {
   if (!data) return null;
 
+  // Helper untuk format tanggal konsisten (Indonesia)
+  const formatDate = (dateString) => {
+    if (!dateString) return "-";
+    return new Date(dateString).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
+  // DEBUG: Tampilkan data yang diterima
+  console.log("LHU Template Data:", {
+    validator: data.validator,
+    validatorExists: "validator" in data,
+    validated_at: data.validated_at,
+    allDataKeys: Object.keys(data),
+  });
+
+  // Ambil validator dari data registrasi
+  // Prioritas: 1. validator dari data, 2. default
+  const validatorName = data.validator || "dr. Uzi Mardha Phoenna, Sp.PK";
+
   return (
-    <div className="p-8 font-sans text-black max-w-[21cm] mx-auto">
+    <div className="font-sans text-black max-w-[21cm] mx-auto print:w-full print:max-w-none">
       {/* HEADER KOP SURAT */}
       <div className="flex justify-between items-center mb-6 border-b-2 border-black pb-4">
         <img
-          src="/src/assets/kop_mail.png"
+          src={kopMailImg}
           alt="Logo"
           className="w-auto object-contain"
           onError={(e) => {
@@ -18,12 +42,12 @@ export default function LHUPrintTemplate({ data }) {
         />
       </div>
 
-      <h3 className="text-center font-bold text-lg underline mb-6">
+      <h3 className="text-center font-bold text-lg mb-6">
         FORMULIR HASIL PEMERIKSAAN LABORATORIUM
       </h3>
 
       {/* INFO PASIEN TABLE */}
-      <div className="grid grid-cols-2 gap-8 text-sm mb-6">
+      <div className="grid grid-cols-2 gap-8 text-sm mb-6 break-inside-avoid">
         <table>
           <tbody>
             <tr>
@@ -34,7 +58,7 @@ export default function LHUPrintTemplate({ data }) {
             </tr>
             <tr>
               <td className="w-32 py-1">Tanggal Lahir</td>
-              <td>: {new Date(data.tgl_lahir).toLocaleDateString("id-ID")}</td>
+              <td>: {formatDate(data.tgl_lahir)}</td>
             </tr>
             <tr>
               <td className="w-32 py-1">NIK</td>
@@ -58,15 +82,25 @@ export default function LHUPrintTemplate({ data }) {
             </tr>
             <tr>
               <td className="py-1">Tanggal daftar</td>
-              <td>: {data.tgl_daftar}</td>
+              <td>: {formatDate(data.tgl_daftar)}</td>
             </tr>
             <tr>
-              <td className="py-1">Kode Lab</td>
+              <td className="py-1">Kode/ID Lab</td>
               <td>: {data.no_sampel_lab}</td>
             </tr>
             <tr>
               <td className="py-1">Waktu Daftar</td>
               <td>: {data.waktu_daftar} WIB</td>
+            </tr>
+            <tr>
+              <td className="py-1">Validator</td>
+              <td>: {data.validator || "Belum divalidasi"}</td>
+            </tr>
+            <tr>
+              <td className="py-1">Tanggal Validasi</td>
+              <td>
+                : {data.validated_at ? formatDate(data.validated_at) : "-"}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -74,7 +108,7 @@ export default function LHUPrintTemplate({ data }) {
 
       {/* HASIL TABLE */}
       <table className="w-full border-collapse border border-black text-sm mb-8">
-        <thead className="bg-gray-100">
+        <thead className="bg-gray-100 print:table-header-group">
           <tr>
             <th className="border border-black p-2 text-left">
               JENIS PEMERIKSAAN
@@ -91,7 +125,10 @@ export default function LHUPrintTemplate({ data }) {
         <tbody>
           {data.tests &&
             data.tests.map((test, idx) => (
-              <tr key={idx}>
+              <tr
+                key={idx}
+                className="break-inside-avoid page-break-inside-avoid"
+              >
                 <td className="border border-black p-2">
                   {test.parameter_name}
                 </td>
@@ -112,21 +149,21 @@ export default function LHUPrintTemplate({ data }) {
       </table>
 
       {/* FOOTER TTD */}
-      <div className="flex justify-end mt-12">
+      <div className="flex justify-end mt-12 break-inside-avoid page-break-inside-avoid">
         <div className="text-center">
           <p className="mb-20">
             Aceh Besar,{" "}
-            {new Date().toLocaleDateString("id-ID", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
+            {data.validated_at
+              ? formatDate(data.validated_at)
+              : new Date().toLocaleDateString("id-ID", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
             <br />
             Dokter Penanggung Jawab
           </p>
-          <p className="font-bold underline text-sm">
-            dr. Uzi Mardha Phoenna, Sp.PK
-          </p>
+          <p className="font-bold text-sm">{validatorName}</p>
         </div>
       </div>
     </div>

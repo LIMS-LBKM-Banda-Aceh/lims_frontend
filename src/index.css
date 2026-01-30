@@ -1,21 +1,62 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #07B8A3; /* Contoh: Biru Royal */
-  --color-secondary: #C4DB28; /* Contoh: Biru Royal */
-  --color-hover: #058172
+  --color-primary: #07b8a3;
+  --color-secondary: #c4db28;
+  --color-hover: #058172;
 }
-
 @media print {
-  /* Menyembunyikan semua notifikasi Toastify saat print */
-  .Toastify, 
-  .Toastify__toast-container {
-    display: none !important;
+  /* 1. Atur halaman kertas bersih tanpa margin bawaan browser */
+  @page {
+    margin: 0mm !important; /* PENTING: Reset margin browser ke 0 */
+    size: auto;
   }
 
-  /* Opsional: Memastikan scrollbar browser tidak tercetak jika ada */
-  body {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  /* 2. Sembunyikan semua element body */
+  body * {
+    visibility: hidden;
+  }
+
+  /* 3. Tampilkan wrapper print section & semua anaknya */
+  #print-section,
+  #print-section * {
+    visibility: visible;
+  }
+
+  /* 4. Konfigurasi Container Print Section */
+  #print-section {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+
+    /* Gunakan width 100% dari kertas */
+    width: 100% !important;
+
+    /* PENTING: Padding 25mm (2.5cm) di semua sisi */
+    padding: 16mm !important;
+
+    /* Pastikan padding tidak membuat konten melebar keluar kertas */
+    box-sizing: border-box !important;
+
+    /* Reset background agar bersih */
+    background: white !important;
+    margin: 0 !important;
+  }
+
+  /* 5. Pastikan helper class (opsional, untuk safety) */
+  .print-content-padding {
+    padding: 20mm !important;
+  }
+
+  /* 6. Utility lain */
+  .print\:hidden {
+    display: none !important;
+  }
+  .print\:block {
+    display: block !important;
+  }
+  .print\:flex {
+    display: flex !important;
   }
 }

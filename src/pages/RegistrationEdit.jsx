@@ -353,7 +353,7 @@ export default function RegistrationEdit() {
       if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
         age--;
       }
-      setForm((prev) => ({ ...prev, umur: age < 0 ? 0 : age }));
+      setForm((prev) => ({ ...prev, umur: Math.max(age, 0) }));
     }
   }, [form.tgl_lahir]);
 

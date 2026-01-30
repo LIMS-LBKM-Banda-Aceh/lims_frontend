@@ -6,12 +6,10 @@ import {
   Save,
   User,
   FlaskConical,
-  CalendarDays,
   FileSpreadsheet,
-  CheckCircle2,
   Search,
-  Clock,
   Plus,
+  Loader2,
   Minus,
 } from "lucide-react";
 
@@ -79,8 +77,8 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
       // Increment Qty
       onChange(
         selectedItems.map((i) =>
-          i.id === item.id ? { ...i, qty: i.qty + 1 } : i
-        )
+          i.id === item.id ? { ...i, qty: i.qty + 1 } : i,
+        ),
       );
     } else {
       // Add New
@@ -95,8 +93,8 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
         // Decrement Qty
         onChange(
           selectedItems.map((i) =>
-            i.id === item.id ? { ...i, qty: i.qty - 1 } : i
-          )
+            i.id === item.id ? { ...i, qty: i.qty - 1 } : i,
+          ),
         );
       } else {
         // Remove completely if qty becomes 0
@@ -130,17 +128,14 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
           />
         </div>
       </div>
-
       <div className="max-h-[400px] overflow-y-auto space-y-4 pr-2 custom-scrollbar">
         {Object.entries(groupedData).map(([category, items]) => {
           const filteredItems = items.filter((item) =>
             item.nama_pemeriksaan
               .toLowerCase()
-              .includes(searchTerm.toLowerCase())
+              .includes(searchTerm.toLowerCase()),
           );
-
           if (filteredItems.length === 0) return null;
-
           return (
             <div key={category}>
               <h4 className="text-xs font-bold text-cyan-700 uppercase tracking-wider mb-2 sticky top-0 bg-gray-50 py-1 z-10">
@@ -150,7 +145,6 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
                 {filteredItems.map((item) => {
                   const qty = getItemQty(item.id);
                   const isSelected = qty > 0;
-
                   return (
                     <div
                       key={item.id}
@@ -182,7 +176,6 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
                         >
                           <Minus size={12} />
                         </button>
-
                         <span
                           className={`text-xs font-bold w-4 text-center ${
                             isSelected ? "text-cyan-700" : "text-gray-300"
@@ -190,7 +183,6 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
                         >
                           {qty}
                         </span>
-
                         <button
                           type="button"
                           onClick={() => handleAdd(item)}
@@ -215,15 +207,13 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
 export default function RegistrationForm({ onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [masterPemeriksaan, setMasterPemeriksaan] = useState([]);
-
-  // [MODIFIED] State ini sekarang menyimpan Array of Object: [{ id, nama, harga, qty }]
   const [selectedItems, setSelectedItems] = useState([]);
-
   const [totalBiaya, setTotalBiaya] = useState(0);
 
   const [form, setForm] = useState({
     nama_pasien: "",
     nik: "",
+    no_sampel_lab: "",
     tgl_lahir: "",
     umur: "",
     jenis_kelamin: "L",
@@ -232,14 +222,11 @@ export default function RegistrationForm({ onSuccess }) {
     asal_sampel: "Mandiri",
     status_pembayaran: "berbayar",
     pengirim_instansi: "",
-    tgl_daftar: new Date().toISOString().split("T")[0],
-    waktu_daftar: new Date().toLocaleTimeString("it-IT", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
     tgl_pengambilan: "",
     catatan_tambahan: "",
   });
+
+  const [checkingNik, setCheckingNik] = useState(false);
 
   useEffect(() => {
     const fetchMaster = async () => {
@@ -263,7 +250,7 @@ export default function RegistrationForm({ onSuccess }) {
     } else {
       const total = selectedItems.reduce(
         (sum, item) => sum + Number(item.harga) * item.qty,
-        0
+        0,
       );
       setTotalBiaya(total);
     }
@@ -289,7 +276,83 @@ export default function RegistrationForm({ onSuccess }) {
     }
   }, [form.tgl_lahir]);
 
+  const handleCheckNik = async (nikValue) => {
+    // Hanya cek jika panjang NIK = 16
+    if (!nikValue || nikValue.length !== 16) return;
+
+    setCheckingNik(true);
+    try {
+      const res = await api.get(`/registrations/check-nik/${nikValue}`);
+
+      if (res.data.success) {
+        if (res.data.found) {
+          // --- KONDISI 1: DATA LAMA DITEMUKAN (Auto Fill) ---
+          const patient = res.data.data;
+
+          setForm((prev) => {
+            // Hitung ulang umur
+            let calculatedAge = "";
+            if (patient.tgl_lahir) {
+              const today = new Date();
+              const birthDate = new Date(patient.tgl_lahir);
+              let age = today.getFullYear() - birthDate.getFullYear();
+              const m = today.getMonth() - birthDate.getMonth();
+              if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+              }
+              calculatedAge = Math.max(age, 0);
+            }
+
+            return {
+              ...prev,
+              nama_pasien: patient.nama_pasien || "",
+              tgl_lahir: patient.tgl_lahir
+                ? new Date(patient.tgl_lahir).toISOString().split("T")[0]
+                : "",
+              umur: calculatedAge,
+              jenis_kelamin: patient.jenis_kelamin || "L",
+              alamat: patient.alamat || "",
+              no_kontak: patient.no_kontak || "",
+            };
+          });
+
+          toast.success(`Data pasien lama ditemukan: ${patient.nama_pasien}`, {
+            position: "top-right",
+            autoClose: 3000,
+          });
+        } else {
+          // --- KONDISI 2: DATA TIDAK DITEMUKAN (Reset Form / Pasien Baru) ---
+          // Ini bagian penting yang sebelumnya hilang!
+          setForm((prev) => ({
+            ...prev,
+            nama_pasien: "",
+            tgl_lahir: "",
+            umur: "",
+            jenis_kelamin: "L", // Reset ke default
+            alamat: "",
+            no_kontak: "",
+            // Catatan: Field lain seperti asal_sampel dll dibiarkan sesuai pilihan user
+          }));
+
+          toast.info("Pasien belum terdaftar. Silakan isi manual.", {
+            position: "top-right",
+            autoClose: 2000,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Gagal cek NIK", error);
+    } finally {
+      setCheckingNik(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
+    // validasi NIK tepat 16 digit
+    if (form.nik && form.nik.length !== 16) {
+      toast.error("NIK harus berjumlah tepat 16 digit!");
+      return;
+    }
     e.preventDefault();
     if (selectedItems.length === 0) {
       toast.warning("Mohon pilih minimal satu jenis pemeriksaan");
@@ -298,7 +361,7 @@ export default function RegistrationForm({ onSuccess }) {
 
     setLoading(true);
 
-    // [MODIFIED] Payload sekarang mengirim 'items' array dengan quantity
+    // Payload mengirim 'items' array dengan quantity
     const payload = {
       ...form,
       items: selectedItems.map((item) => ({ id: item.id, qty: item.qty })),
@@ -357,6 +420,42 @@ export default function RegistrationForm({ onSuccess }) {
             <User size={18} /> Identitas Pasien
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="relative">
+              <FormInput
+                label="NIK"
+                name="nik"
+                value={form.nik}
+                type="text"
+                inputMode="numeric"
+                // Tambahkan onBlur untuk memicu pengecekan saat user pindah field
+                onBlur={(e) => handleCheckNik(e.target.value)}
+                onChange={(e) => {
+                  const rawValue = e.target.value;
+                  if (/\D/.test(rawValue)) {
+                    // ... logic toast warning angka
+                  }
+                  const cleanValue = rawValue.replace(/\D/g, "");
+                  if (cleanValue.length <= 16) {
+                    handleChange({
+                      target: { name: "nik", value: cleanValue },
+                    });
+
+                    // Opsional: Auto trigger jika sudah pas 16 digit saat mengetik
+                    if (cleanValue.length === 16) {
+                      handleCheckNik(cleanValue);
+                    }
+                  }
+                }}
+                placeholder="16 digit NIK"
+              />
+
+              {/* Indikator Loading di sebelah kanan dalam input */}
+              {checkingNik && (
+                <div className="absolute top-[34px] right-3">
+                  <Loader2 className="animate-spin text-cyan-600" size={18} />
+                </div>
+              )}
+            </div>
             <FormInput
               label="Nama Lengkap"
               name="nama_pasien"
@@ -364,13 +463,6 @@ export default function RegistrationForm({ onSuccess }) {
               onChange={handleChange}
               required
               placeholder="Nama sesuai KTP"
-            />
-            <FormInput
-              label="NIK"
-              name="nik"
-              value={form.nik}
-              onChange={handleChange}
-              placeholder="16 digit NIK"
             />
             <div className="grid grid-cols-2 gap-3">
               <FormInput
@@ -472,7 +564,7 @@ export default function RegistrationForm({ onSuccess }) {
                             <span className="font-mono text-cyan-700">
                               {
                                 formatRupiah(item.harga * item.qty).split(
-                                  ","
+                                  ",",
                                 )[0]
                               }
                             </span>
@@ -526,25 +618,15 @@ export default function RegistrationForm({ onSuccess }) {
                 onChange={handleChange}
                 placeholder="Jika ada"
               />
-              <div className="grid grid-cols-2 gap-3">
-                <FormInput
-                  label="Tgl Daftar"
-                  type="date"
-                  name="tgl_daftar"
-                  value={form.tgl_daftar}
-                  onChange={handleChange}
-                  icon={CalendarDays}
-                />
-
-                <FormInput
-                  label="Jam Daftar"
-                  type="time"
-                  name="waktu_daftar"
-                  value={form.waktu_daftar}
-                  onChange={handleChange}
-                  icon={Clock}
-                />
-              </div>
+              <FormInput
+                label="Nomor Sampel Lab"
+                name="no_sampel_lab"
+                value={form.no_sampel_lab}
+                onChange={handleChange}
+                required
+                placeholder="Contoh: S-001"
+                icon={FlaskConical}
+              />
             </div>
           </div>
         </div>

@@ -23,6 +23,7 @@ import UserManagement from "./UserManagement";
 import MasterPemeriksaan from "./MasterPemeriksaan";
 import LabQueue from "./LabQueue";
 import DataManagement from "./DataManagement";
+import ValidationQueue from "./ValidationQueue";
 import SamplerQueue from "./SamplerQueue";
 
 const StatCard = ({ title, value, icon: Icon, color, subtext }) => (
@@ -142,7 +143,7 @@ export default function Dashboard() {
     try {
       const resData = await api.get("/registrations");
       setRegistrations(
-        Array.isArray(resData.data.data) ? resData.data.data : []
+        Array.isArray(resData.data.data) ? resData.data.data : [],
       );
 
       const resStats = await api.get("/registrations/stats");
@@ -204,7 +205,7 @@ export default function Dashboard() {
       setView(newView);
       setIsMobileOpen(false);
     },
-    [user?.role]
+    [user?.role],
   );
 
   return (
@@ -314,10 +315,13 @@ export default function Dashboard() {
               {view === "sampler" && (
                 <SamplerQueue onRefreshStats={fetchMainData} />
               )}
+              {view === "validation" && (
+                <ValidationQueue onRefreshStats={fetchMainData} />
+              )}
+
               {view === "management" && (
                 <DataManagement onRefreshStats={fetchMainData} />
               )}
-
               {view === "master" && <MasterPemeriksaan />}
               {view === "users" && <UserManagement />}
             </div>
