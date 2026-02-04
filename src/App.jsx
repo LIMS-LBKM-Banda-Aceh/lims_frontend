@@ -64,7 +64,7 @@ function App() {
           <Route
             path="/registrations/edit/:id"
             element={
-              <ProtectedRoute allowedRoles={["admin", "input", "lab"]}>
+              <ProtectedRoute allowedRoles={["admin", "input", "lab", "manajemen"]}>
                 <RegistrationEdit />
               </ProtectedRoute>
             }

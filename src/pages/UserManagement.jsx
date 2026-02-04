@@ -364,7 +364,7 @@ export default function UserManagement() {
                 <button
                   type="submit"
                   disabled={submitLoading}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold hover:shadow-lg hover:shadow-cyan-200 transition flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 rounded-xl bg-linear-to-r from-cyan-600 to-blue-600 text-white font-bold hover:shadow-lg hover:shadow-cyan-200 transition flex items-center justify-center gap-2"
                 >
                   {submitLoading ? (
                     <Loader2 className="animate-spin" size={18} />

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import api from "../api/axios";
 import { toast } from "react-toastify";
+
 import {
   Syringe,
   Clock,
@@ -14,31 +15,38 @@ import {
   FlaskConical,
   ClipboardList,
   RefreshCw,
-  ArrowRight,
   Bug,
   Droplets,
   Beef,
   Microscope,
+  ArrowUpDown,
+  ListFilter,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 
 export default function SamplerQueue({ onRefreshStats }) {
+  // --- EXISTING STATE ---
   const [activeTab, setActiveTab] = useState("queue");
   const [dataList, setDataList] = useState([]);
-  const [masterMap, setMasterMap] = useState({}); // State untuk Mapping Nama -> Kategori
+  const [masterMap, setMasterMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // --- NEW STATE FOR SORTING & PAGINATION ---
+  const [itemsPerPage, setItemsPerPage] = useState(25); // Default 25 baris
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState("newest"); // Options: newest, oldest, name_asc
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch Registration & Master Data secara paralel
       const [regRes, masterRes] = await Promise.all([
         api.get("/registrations"),
         api.get("/master/pemeriksaan"),
       ]);
 
-      // 1. Proses Master Data menjadi Map/Dictionary agar pencarian cepat
-      // Format: { "Gula Darah": "Kimia Klinik", "Darah Rutin": "Hematologi" }
       if (masterRes.data.success) {
         const map = {};
         masterRes.data.data.forEach((item) => {
@@ -47,10 +55,9 @@ export default function SamplerQueue({ onRefreshStats }) {
         setMasterMap(map);
       }
 
-      // 2. Proses Registration Data
       if (regRes.data.success) {
         const relevantData = regRes.data.data.filter((item) =>
-          ["terdaftar", "proses_sampling"].includes(item.status)
+          ["terdaftar", "proses_sampling"].includes(item.status),
         );
         setDataList(relevantData);
       }
@@ -66,26 +73,25 @@ export default function SamplerQueue({ onRefreshStats }) {
     fetchData();
   }, [fetchData]);
 
-  // --- LOGIKA BARU: RENDER BADGES BERDASARKAN KATEGORI MASTER ---
+  // Reset page ke 1 saat tab atau search berubah agar UX konsisten
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchQuery, itemsPerPage]);
+
   const renderSampleBadges = (jenisPemeriksaanString) => {
     if (!jenisPemeriksaanString) return null;
-
-    // 1. Parsing String: "Gula Darah (1), Urine Rutin (1)" -> ["gula darah", "urine rutin"]
     const examNames = jenisPemeriksaanString.split(",").map((str) =>
       str
         .trim()
-        .replace(/\s*\(\d+\)$/, "") // Hapus qty "(1)" di belakang
-        .toLowerCase()
+        .replace(/\s*\(\d+\)$/, "")
+        .toLowerCase(),
     );
-
-    // 2. Cari Kategori Unik dari MasterMap
     const detectedCategories = new Set();
     examNames.forEach((name) => {
       const cat = masterMap[name];
       if (cat) detectedCategories.add(cat.toUpperCase());
     });
 
-    // Jika tidak ada match (misal data master dihapus), fallback ke default
     if (detectedCategories.size === 0) {
       return (
         <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-gray-200 flex items-center gap-1 w-fit">
@@ -94,16 +100,12 @@ export default function SamplerQueue({ onRefreshStats }) {
       );
     }
 
-    // 3. Render Badge sesuai Kategori Master
     return (
       <div className="flex flex-wrap gap-1">
         {Array.from(detectedCategories).map((cat) => {
-          // GROUPING KATEGORI KE STYLE BADGE
-
-          // -- DARAH (Hematologi, Kimia Klinik, Imunologi) --
           if (
             ["HEMATOLOGI", "KIMIA KLINIK", "IMUNOLOGI", "SEROLOGI"].some((c) =>
-              cat.includes(c)
+              cat.includes(c),
             )
           ) {
             return (
@@ -115,8 +117,6 @@ export default function SamplerQueue({ onRefreshStats }) {
               </span>
             );
           }
-
-          // -- URIN (Urinalisa) --
           if (cat.includes("URIN")) {
             return (
               <span
@@ -127,11 +127,9 @@ export default function SamplerQueue({ onRefreshStats }) {
               </span>
             );
           }
-
-          // -- VEKTOR / PARASIT --
           if (
             ["VEKTOR", "PARASITOLOGI", "ENTOMOLOGI"].some((c) =>
-              cat.includes(c)
+              cat.includes(c),
             )
           ) {
             return (
@@ -143,11 +141,9 @@ export default function SamplerQueue({ onRefreshStats }) {
               </span>
             );
           }
-
-          // -- AIR / LINGKUNGAN / FISIKA --
           if (
             ["LINGKUNGAN", "AIR", "FISIKA", "LIMBAH"].some((c) =>
-              cat.includes(c)
+              cat.includes(c),
             )
           ) {
             return (
@@ -159,11 +155,9 @@ export default function SamplerQueue({ onRefreshStats }) {
               </span>
             );
           }
-
-          // -- MAKANAN / TOKSIKOLOGI --
           if (
             ["MAKANAN", "MINUMAN", "TOKSIKOLOGI", "KIMIA MAKANAN"].some((c) =>
-              cat.includes(c)
+              cat.includes(c),
             )
           ) {
             return (
@@ -175,11 +169,9 @@ export default function SamplerQueue({ onRefreshStats }) {
               </span>
             );
           }
-
-          // -- BIOMOLEKULER / MIKROBIOLOGI --
           if (
             ["BIOMOLEKULER", "PCR", "MIKROBIOLOGI", "BAKTERIOLOGI"].some((c) =>
-              cat.includes(c)
+              cat.includes(c),
             )
           ) {
             return (
@@ -191,8 +183,6 @@ export default function SamplerQueue({ onRefreshStats }) {
               </span>
             );
           }
-
-          // -- DEFAULT / LAINNYA --
           return (
             <span
               key={cat}
@@ -206,22 +196,45 @@ export default function SamplerQueue({ onRefreshStats }) {
     );
   };
 
-  // Filter & Search Logic
-  const filteredData = useMemo(() => {
-    return dataList.filter((item) => {
+  // --- LOGIKA FILTER + SORT + PAGINATION ---
+  const processedData = useMemo(() => {
+    // 1. Filter Tab & Search
+    let filtered = dataList.filter((item) => {
       const matchesTab =
         activeTab === "queue"
           ? item.status === "terdaftar"
           : item.status === "proses_sampling";
-
       const matchesSearch =
         item.nama_pasien.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.no_reg.toLowerCase().includes(searchQuery.toLowerCase());
-
       return matchesTab && matchesSearch;
     });
-  }, [dataList, activeTab, searchQuery]);
 
+    // 2. Sorting Logic
+    filtered.sort((a, b) => {
+      if (sortBy === "newest")
+        return new Date(b.created_at) - new Date(a.created_at);
+      if (sortBy === "oldest")
+        return new Date(a.created_at) - new Date(b.created_at);
+      if (sortBy === "name_asc")
+        return a.nama_pasien.localeCompare(b.nama_pasien);
+      if (sortBy === "urgent")
+        return (b.catatan_tambahan ? 1 : 0) - (a.catatan_tambahan ? 1 : 0); // Prioritas yg ada catatan
+      return 0;
+    });
+
+    return filtered;
+  }, [dataList, activeTab, searchQuery, sortBy]);
+
+  // 3. Slicing for Pagination
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return processedData.slice(startIndex, startIndex + itemsPerPage);
+  }, [processedData, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(processedData.length / itemsPerPage);
+
+  // --- ACTIONS ---
   const handleStartSampling = async (id, noReg) => {
     try {
       await api.put(`/registrations/${id}/start-sampling`);
@@ -237,11 +250,10 @@ export default function SamplerQueue({ onRefreshStats }) {
   const handleSendToLab = async (id, noReg) => {
     if (
       !confirm(
-        `Konfirmasi: Sampel ${noReg} sudah selesai diambil dan siap dikirim ke Lab?`
+        `Konfirmasi: Sampel ${noReg} sudah selesai diambil dan siap dikirim ke Lab?`,
       )
     )
       return;
-
     try {
       await api.put(`/registrations/${id}/send-to-lab`);
       toast.success(`Sampel ${noReg} diteruskan ke Laboratorium!`);
@@ -261,7 +273,7 @@ export default function SamplerQueue({ onRefreshStats }) {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-cyan-50 rounded-xl text-cyan-600">
+          <div className="p-3 bg-yellow-50 rounded-xl text-yellow-600">
             <Syringe size={28} />
           </div>
           <div>
@@ -274,8 +286,29 @@ export default function SamplerQueue({ onRefreshStats }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative flex-1 md:w-64">
+        <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
+          {/* SORTING DROPDOWN (NEW) */}
+          <div className="relative group w-full md:w-40">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <ArrowUpDown size={16} />
+            </div>
+            <select
+              className="w-full pl-9 pr-8 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none text-sm font-semibold text-gray-600 appearance-none cursor-pointer hover:bg-gray-50 transition-all"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="newest">Terbaru</option>
+              <option value="oldest">Terlama</option>
+              <option value="name_asc">Nama (A-Z)</option>
+              <option value="urgent">Prioritas Catatan</option>
+            </select>
+            <ChevronDown
+              size={14}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+            />
+          </div>
+
+          <div className="relative flex-1 md:w-64 w-full">
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
               size={18}
@@ -288,9 +321,10 @@ export default function SamplerQueue({ onRefreshStats }) {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+
           <button
             onClick={fetchData}
-            className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 transition-all shadow-sm"
+            className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 transition-all shadow-sm hidden md:block"
             title="Refresh Antrian"
           >
             <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
@@ -311,11 +345,7 @@ export default function SamplerQueue({ onRefreshStats }) {
           <Clock size={16} />
           Antrian Baru
           <span
-            className={`ml-1 px-2 py-0.5 rounded-md text-[10px] ${
-              activeTab === "queue"
-                ? "bg-cyan-100 text-cyan-700"
-                : "bg-gray-200"
-            }`}
+            className={`ml-1 px-2 py-0.5 rounded-md text-[10px] ${activeTab === "queue" ? "bg-cyan-100 text-cyan-700" : "bg-gray-200"}`}
           >
             {getCounts("terdaftar")}
           </span>
@@ -331,11 +361,7 @@ export default function SamplerQueue({ onRefreshStats }) {
           <FlaskConical size={16} />
           Sedang Sampling
           <span
-            className={`ml-1 px-2 py-0.5 rounded-md text-[10px] ${
-              activeTab === "process"
-                ? "bg-orange-100 text-orange-600"
-                : "bg-gray-200"
-            }`}
+            className={`ml-1 px-2 py-0.5 rounded-md text-[10px] ${activeTab === "process" ? "bg-orange-100 text-orange-600" : "bg-gray-200"}`}
           >
             {getCounts("proses_sampling")}
           </span>
@@ -344,7 +370,9 @@ export default function SamplerQueue({ onRefreshStats }) {
 
       {/* Main Table Card */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[400px]">
+          {" "}
+          {/* Min height added to prevent jumping */}
           <table className="w-full text-left">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-200">
@@ -374,7 +402,7 @@ export default function SamplerQueue({ onRefreshStats }) {
                     </div>
                   </td>
                 </tr>
-              ) : filteredData.length === 0 ? (
+              ) : paginatedData.length === 0 ? (
                 <tr>
                   <td colSpan="4" className="py-24">
                     <div className="flex flex-col items-center justify-center text-center">
@@ -391,15 +419,15 @@ export default function SamplerQueue({ onRefreshStats }) {
                   </td>
                 </tr>
               ) : (
-                filteredData.map((item) => (
+                paginatedData.map((item) => (
                   <tr
                     key={item.id}
                     className="hover:bg-gray-50/50 transition-colors group"
                   >
                     {/* Kolom 1: Identitas */}
-                    <td className="px-6 py-5">
+                    <td className="px-6 py-5 align-top">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-linear-to-br from-gray-100 to-gray-200 flex flex-col items-center justify-center text-gray-500 border border-gray-200 group-hover:from-cyan-50 group-hover:to-blue-50 group-hover:border-cyan-100 transition-all">
+                        <div className="w-12 h-12 rounded-2xl bg-linear-to-br from-gray-100 to-gray-200 flex flex-col items-center justify-center text-gray-500 border border-gray-200 group-hover:from-cyan-50 group-hover:to-blue-50 group-hover:border-cyan-100 transition-all shrink-0">
                           <User size={20} />
                           <span className="text-[9px] font-bold uppercase">
                             {item.jenis_kelamin}
@@ -421,11 +449,10 @@ export default function SamplerQueue({ onRefreshStats }) {
                       </div>
                     </td>
 
-                    {/* Kolom 2: Pemeriksaan & Badges (FIXED) */}
-                    <td className="px-6 py-5">
+                    {/* Kolom 2: Pemeriksaan & Badges */}
+                    <td className="px-6 py-5 align-top">
                       <div className="space-y-2">
                         {renderSampleBadges(item.jenis_pemeriksaan)}
-
                         <p
                           className="text-xs text-gray-600 font-medium line-clamp-2 italic"
                           title={item.jenis_pemeriksaan}
@@ -445,7 +472,7 @@ export default function SamplerQueue({ onRefreshStats }) {
                     </td>
 
                     {/* Kolom 3: Waktu */}
-                    <td className="px-6 py-5">
+                    <td className="px-6 py-5 align-top">
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center gap-2 text-xs text-gray-500">
                           <Clock size={14} className="text-gray-400" />
@@ -453,7 +480,7 @@ export default function SamplerQueue({ onRefreshStats }) {
                             Terdaftar:{" "}
                             {new Date(item.created_at).toLocaleTimeString(
                               "id-ID",
-                              { hour: "2-digit", minute: "2-digit" }
+                              { hour: "2-digit", minute: "2-digit" },
                             )}{" "}
                             WIB
                           </span>
@@ -468,7 +495,7 @@ export default function SamplerQueue({ onRefreshStats }) {
                     </td>
 
                     {/* Kolom 4: Aksi */}
-                    <td className="px-6 py-5">
+                    <td className="px-6 py-5 align-top">
                       <div className="flex justify-center">
                         {item.status === "terdaftar" ? (
                           <button
@@ -497,7 +524,7 @@ export default function SamplerQueue({ onRefreshStats }) {
                                 size={12}
                                 className="text-orange-400"
                               />{" "}
-                              Periksa Kembali Label
+                              Periksa Label
                             </span>
                           </div>
                         )}
@@ -510,18 +537,61 @@ export default function SamplerQueue({ onRefreshStats }) {
           </table>
         </div>
 
-        {/* Footer Info */}
-        {!loading && (
-          <div className="bg-gray-50/50 px-6 py-4 border-t border-gray-100 flex justify-between items-center text-xs font-bold text-gray-400">
-            <div className="flex items-center gap-4">
-              <span>Total Antrian: {filteredData.length} Pasien</span>
-              <span className="h-4 w-px bg-gray-200"></span>
-              <span className="text-cyan-600">
-                Update Terakhir: {new Date().toLocaleTimeString()}
+        {/* Footer Info & Pagination (MODIFIED) */}
+        {!loading && processedData.length > 0 && (
+          <div className="bg-gray-50/50 px-6 py-4 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-bold text-gray-500">
+            {/* Left: Total & Rows Per Page */}
+            <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
+              <span className="whitespace-nowrap">
+                Total: {processedData.length} Pasien
               </span>
+
+              <div className="flex items-center gap-2 pl-4 border-l border-gray-200">
+                <span className="text-gray-400 hidden sm:inline">
+                  Tampilkan:
+                </span>
+                <div className="relative">
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                    className="bg-white border border-gray-200 text-gray-700 py-1 pl-2 pr-6 rounded-lg appearance-none cursor-pointer focus:ring-2 focus:ring-cyan-500 outline-none"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                  <ListFilter
+                    size={12}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                  />
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              Sistem LIMS <ArrowRight size={10} /> Ruang Sampling
+
+            {/* Right: Pagination Controls */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft size={14} />
+              </button>
+
+              <span className="px-2">
+                Halaman {currentPage} dari {totalPages}
+              </span>
+
+              <button
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
+                disabled={currentPage === totalPages}
+                className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight size={14} />
+              </button>
             </div>
           </div>
         )}
