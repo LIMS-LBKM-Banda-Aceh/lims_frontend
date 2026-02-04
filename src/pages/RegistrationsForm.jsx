@@ -348,18 +348,18 @@ export default function RegistrationForm({ onSuccess }) {
   };
 
   const handleSubmit = async (e) => {
+    e.preventDefault(); // ⬅️ WAJIB DI PALING ATAS
+
     // validasi NIK tepat 16 digit
     if (form.nik && form.nik.length !== 16) {
       toast.error("NIK harus berjumlah tepat 16 digit!");
       return;
     }
-    e.preventDefault();
+
     if (selectedItems.length === 0) {
       toast.warning("Mohon pilih minimal satu jenis pemeriksaan");
       return;
     }
-
-    setLoading(true);
 
     // Payload mengirim 'items' array dengan quantity
     const payload = {

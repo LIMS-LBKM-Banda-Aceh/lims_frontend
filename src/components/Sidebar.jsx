@@ -70,8 +70,7 @@ export default function Sidebar({
 
   if (
     user?.role === "manajemen" ||
-    user?.role === "admin" ||
-    user?.role === "validator"
+    user?.role === "admin" 
   ) {
     menuItems.push({
       id: "management",

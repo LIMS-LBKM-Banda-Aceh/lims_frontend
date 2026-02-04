@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+
 import {
   Menu,
   Users,
@@ -249,7 +250,6 @@ export default function Dashboard() {
             </span>
           </div>
         </header>
-
         <main className="p-6 md:p-8">
           {loading ? (
             <div className="flex flex-col items-center justify-center h-64 gap-4">
@@ -264,14 +264,9 @@ export default function Dashboard() {
                   stats={stats}
                   onChangeView={handleChangeView}
                   onRefresh={fetchMainData}
-                  userRole={user?.role} // 3. Passing Role ke Component
+                  userRole={user?.role} 
                 />
               )}
-
-              {/* View create/list/detail akan tetap tersembunyi karena
-                  role 'lab' tidak memiliki akses menu untuk men-trigger view ini 
-                  via sidebar, dan tombol 'Lihat Semua' sudah dihilangkan di atas.
-              */}
               {view === "create" && (
                 <RegistrationForm
                   onSuccess={() => {
