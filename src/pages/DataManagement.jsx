@@ -141,7 +141,7 @@ export default function DataManagement({ onRefreshStats }) {
 
   const handleDelete = async (id) => {
     if (
-      window.confirm(
+      globalThis.confirm(
         "Apakah Anda yakin ingin menghapus data ini? Tindakan ini tidak bisa dibatalkan.",
       )
     ) {
@@ -584,7 +584,7 @@ export default function DataManagement({ onRefreshStats }) {
                           </span>
                         )}
 
-                        {user?.role === "manajemen" && (
+                        {(user?.role === "manajemen" || user?.role === "admin") && (
                           <div className="flex gap-1 ml-2 pl-2 border-l border-gray-200">
                             <button
                               onClick={() =>

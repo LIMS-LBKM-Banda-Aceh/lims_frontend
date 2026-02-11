@@ -79,14 +79,13 @@ export default function Sidebar({
     });
   }
 
-  if (user?.role === "admin") {
+  if (user?.role === "admin" || user?.role === "input") {
     menuItems.push({
       id: "master",
       label: "Master Data",
       icon: Database,
       isAdmin: true,
-    });
-    menuItems.push({
+    }, {
       id: "users",
       label: "User Management",
       icon: UserCog,

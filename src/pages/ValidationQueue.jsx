@@ -22,6 +22,9 @@ import {
   ChevronRight,
   ChevronDown,
   Microscope,
+  Edit2, 
+  Save, 
+  XCircle, 
 } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -33,10 +36,15 @@ export default function ValidationQueue({ onRefreshStats }) {
   const [previewData, setPreviewData] = useState(null);
   const [processingAcc, setProcessingAcc] = useState(false);
 
-  // --- NEW STATE FOR SORTING & PAGINATION (Standardized) ---
+  // --- NEW STATE FOR EDITING ---
+  const [editingTestId, setEditingTestId] = useState(null);
+  const [editValue, setEditValue] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // --- NEW STATE FOR SORTING & PAGINATION ---
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState("newest"); // Options: newest, oldest, name_asc
+  const [sortBy, setSortBy] = useState("newest");
 
   const calculateDuration = (start, end) => {
     if (!start || !end) return "-";
@@ -67,7 +75,6 @@ export default function ValidationQueue({ onRefreshStats }) {
       console.error("Error fetching validation data:", error);
       toast.error("Gagal memuat data validasi");
     } finally {
-      // Delay kecil untuk animasi loading yang halus
       setTimeout(() => setLoading(false), 500);
     }
   };
@@ -76,14 +83,12 @@ export default function ValidationQueue({ onRefreshStats }) {
     fetchData();
   }, []);
 
-  // Reset pagination saat search/limit berubah
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, itemsPerPage]);
 
-  // --- LOGIKA FILTER + SORT + PAGINATION (Standardized) ---
+  // --- LOGIKA FILTER + SORT + PAGINATION ---
   const processedData = useMemo(() => {
-    // 1. Filter Search
     let filtered = data.filter(
       (item) =>
         (item.nama_pasien || "")
@@ -95,7 +100,6 @@ export default function ValidationQueue({ onRefreshStats }) {
           .includes(searchTerm.toLowerCase()),
     );
 
-    // 2. Sorting Logic
     filtered.sort((a, b) => {
       if (sortBy === "newest")
         return (
@@ -115,7 +119,6 @@ export default function ValidationQueue({ onRefreshStats }) {
     return filtered;
   }, [data, searchTerm, sortBy]);
 
-  // 3. Slicing for Pagination
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return processedData.slice(startIndex, startIndex + itemsPerPage);
@@ -123,7 +126,7 @@ export default function ValidationQueue({ onRefreshStats }) {
 
   const totalPages = Math.ceil(processedData.length / itemsPerPage);
 
-  // --- HANDLERS (UNCHANGED LOGIC) ---
+  // --- HANDLERS ---
   const handleOpenPreview = async (id) => {
     const toastId = toast.loading("Memuat rincian hasil...");
     try {
@@ -148,8 +151,60 @@ export default function ValidationQueue({ onRefreshStats }) {
     }
   };
 
+  // --- HANDLER BARU: EDIT RESULT ---
+  const handleStartEdit = (test) => {
+    setEditingTestId(test.id);
+    setEditValue(test.nilai);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTestId(null);
+    setEditValue("");
+  };
+
+  const handleSaveEdit = async (testId) => {
+    if (!editValue || editValue.trim() === "") {
+      toast.warning("Nilai tidak boleh kosong");
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      // Panggil endpoint update result
+      const res = await api.put(`/tests/${testId}/result`, {
+        nilai: editValue,
+      });
+
+      if (res.data.success) {
+        toast.success("Hasil berhasil diperbarui");
+
+        // Update state lokal (previewData) agar UI berubah tanpa reload
+        setPreviewData((prev) => ({
+          ...prev,
+          tests: prev.tests.map((t) =>
+            t.id === testId ? { ...t, nilai: editValue } : t,
+          ),
+        }));
+
+        setEditingTestId(null);
+      }
+    } catch (error) {
+      console.error("Error update test:", error);
+      toast.error("Gagal mengupdate hasil");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   const handleApprove = async () => {
     if (!previewData) return;
+
+    // Pastikan tidak ada yang sedang diedit
+    if (editingTestId) {
+      toast.warning("Selesaikan edit data terlebih dahulu");
+      return;
+    }
+
     setProcessingAcc(true);
     try {
       const res = await api.put(`/registrations/${previewData.id}/finalize`);
@@ -356,15 +411,14 @@ export default function ValidationQueue({ onRefreshStats }) {
           </table>
         </div>
 
-        {/* --- FOOTER INFO & PAGINATION --- */}
+        {/* --- FOOTER --- */}
         {!loading && processedData.length > 0 && (
           <div className="bg-gray-50/50 px-6 py-4 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-bold text-gray-500">
-            {/* Left: Total & Rows Per Page */}
+            {/* Left: Total */}
             <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
               <span className="whitespace-nowrap">
                 Total: {processedData.length} Data
               </span>
-
               <div className="flex items-center gap-2 pl-4 border-l border-gray-200">
                 <span className="text-gray-400 hidden sm:inline">
                   Tampilkan:
@@ -388,7 +442,7 @@ export default function ValidationQueue({ onRefreshStats }) {
               </div>
             </div>
 
-            {/* Right: Pagination Controls */}
+            {/* Right: Pagination */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -397,11 +451,9 @@ export default function ValidationQueue({ onRefreshStats }) {
               >
                 <ChevronLeft size={14} />
               </button>
-
               <span className="px-2">
                 Halaman {currentPage} dari {totalPages}
               </span>
-
               <button
                 onClick={() =>
                   setCurrentPage((p) => Math.min(totalPages, p + 1))
@@ -414,15 +466,9 @@ export default function ValidationQueue({ onRefreshStats }) {
             </div>
           </div>
         )}
-
-        {!loading && (
-          <div className="bg-gray-50 px-6 py-2 border-t border-gray-200 text-[10px] text-gray-400 font-bold flex justify-end items-center gap-1">
-            Sistem LIMS <ArrowRight size={10} /> Validasi
-          </div>
-        )}
       </div>
 
-      {/* --- MODAL PREVIEW & ACC (Style Updated) --- */}
+      {/* --- MODAL PREVIEW & ACC --- */}
       {previewData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -438,7 +484,10 @@ export default function ValidationQueue({ onRefreshStats }) {
                 </p>
               </div>
               <button
-                onClick={() => setPreviewData(null)}
+                onClick={() => {
+                  setPreviewData(null);
+                  setEditingTestId(null);
+                }}
                 className="p-2 hover:bg-white rounded-full transition text-gray-500 hover:text-red-500 border border-transparent hover:border-gray-200 hover:shadow-sm"
               >
                 <X size={20} />
@@ -527,7 +576,7 @@ export default function ValidationQueue({ onRefreshStats }) {
                 </div>
               </div>
 
-              {/* Tabel Hasil */}
+              {/* Tabel Hasil dengan FITUR EDIT */}
               <div>
                 <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm">
                   <FileText size={16} className="text-emerald-600" /> Detail
@@ -538,7 +587,7 @@ export default function ValidationQueue({ onRefreshStats }) {
                     <thead className="bg-gray-100 text-gray-600 font-bold text-[11px] uppercase tracking-wider">
                       <tr>
                         <th className="px-5 py-3">Parameter</th>
-                        <th className="px-5 py-3 text-center bg-gray-200/50">
+                        <th className="px-5 py-3 text-center bg-gray-200/50 w-1/3">
                           Hasil
                         </th>
                         <th className="px-5 py-3">Satuan</th>
@@ -555,9 +604,56 @@ export default function ValidationQueue({ onRefreshStats }) {
                           <td className="px-5 py-3 font-semibold text-gray-700">
                             {test.parameter_name}
                           </td>
-                          <td className="px-5 py-3 text-center font-bold text-gray-900 bg-emerald-50/30 text-base">
-                            {test.nilai}
+
+                          {/* KOLOM HASIL YANG BISA DIEDIT */}
+                          <td className="px-5 py-3 text-center font-bold text-gray-900 bg-emerald-50/30">
+                            {editingTestId === test.id ? (
+                              <div className="flex items-center gap-2 justify-center">
+                                <input
+                                  type="text"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  className="w-full max-w-[120px] px-2 py-1 text-sm border border-emerald-400 rounded focus:ring-2 focus:ring-emerald-200 outline-none text-center bg-white"
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => handleSaveEdit(test.id)}
+                                  disabled={isSavingEdit}
+                                  className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                  {isSavingEdit ? (
+                                    <Loader2
+                                      size={14}
+                                      className="animate-spin"
+                                    />
+                                  ) : (
+                                    <Save size={14} />
+                                  )}
+                                </button>
+                                <button
+                                  onClick={handleCancelEdit}
+                                  disabled={isSavingEdit}
+                                  className="p-1.5 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300"
+                                >
+                                  <XCircle size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between group/cell">
+                                <span className="flex-1 text-center text-base">
+                                  {test.nilai}
+                                </span>
+                                <button
+                                  onClick={() => handleStartEdit(test)}
+                                  className="opacity-0 group-hover/cell:opacity-100 p-1 text-gray-400 hover:text-emerald-600 transition-opacity"
+                                  title="Edit Nilai"
+                                >
+                                  <Edit2 size={14} />
+                                </button>
+                              </div>
+                            )}
                           </td>
+
                           <td className="px-5 py-3 text-gray-500 text-xs">
                             {test.satuan}
                           </td>
@@ -578,7 +674,10 @@ export default function ValidationQueue({ onRefreshStats }) {
             {/* Modal Footer */}
             <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
               <button
-                onClick={() => setPreviewData(null)}
+                onClick={() => {
+                  setPreviewData(null);
+                  setEditingTestId(null);
+                }}
                 className="px-6 py-2.5 rounded-xl border border-gray-300 text-gray-600 font-bold text-sm hover:bg-white hover:shadow-sm transition-all"
               >
                 Tutup
@@ -586,7 +685,7 @@ export default function ValidationQueue({ onRefreshStats }) {
 
               <button
                 onClick={handleApprove}
-                disabled={processingAcc}
+                disabled={processingAcc || editingTestId !== null}
                 className="px-6 py-2.5 rounded-xl bg-linear-to-r from-emerald-600 to-green-600 text-white font-bold text-sm hover:shadow-lg hover:shadow-emerald-200 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {processingAcc ? (

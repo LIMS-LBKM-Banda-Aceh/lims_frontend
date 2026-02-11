@@ -5,6 +5,7 @@ import api from "../api/axios";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
 import kopMailImg from "../assets/kop_mail.png";
+import QRCode from "react-qr-code";
 
 import {
   ArrowLeft,
@@ -65,6 +66,16 @@ export default function RegistrationDetail({ data, onBack }) {
       minimumFractionDigits: 0,
     }).format(num || 0);
   };
+
+  const qrInvoiceData = JSON.stringify({
+    type: "INVOICE_PNBP",
+    reg: data.no_reg,
+    inv: invoiceNo,
+    pasien: data.nama_pasien,
+    total: data.total_biaya,
+    petugas: currentUser?.fullname || currentUser?.username || "Admin",
+    date: new Date().toISOString(),
+  });
 
   // Logic Render Tabel Biaya (Improved 2-Column UI/UX)
   const renderItemTable = () => {
@@ -417,19 +428,19 @@ export default function RegistrationDetail({ data, onBack }) {
             </div>
 
             {/* Footer Tanda Tangan */}
-            <div className="hidden print:flex mt-8 pt-8 justify-between px-8 text-center text-xs text-black break-inside-avoid items-end">
-              {/* SISI KIRI: PASIEN */}
-              <div className="flex flex-col">
-                {/* Baris kosong untuk menyeimbangkan baris lokasi/tanggal di sisi kanan */}
-                <p className="mb-12">Pasien / Pengirim</p>
-                {/* <p className="invisible">Placeholder</p> */}
+            {/* <div className="hidden print:flex mt-8 pt-8 justify-end px-8 text-center text-xs text-black break-inside-avoid items-end"> */}
+            <div className="hidden print:flex mt-8 pt-8 justify-end text-center text-xs text-black break-inside-avoid items-end">
+
+              {/* <div className="flex flex-col items-center w-56">
+                <p className="mb-20">Pasien / Pengirim</p>
                 <p className="font-bold underline">
                   {data.nama_pasien || ".........................."}
                 </p>
-              </div>
+              </div>  */}
+             
 
               {/* SISI KANAN: PETUGAS */}
-              <div className="flex flex-col">
+              <div className="flex flex-col items-center justify-center text-center w-64">
                 <p>
                   Aceh Besar,{" "}
                   {new Date().toLocaleDateString("id-ID", {
@@ -438,7 +449,23 @@ export default function RegistrationDetail({ data, onBack }) {
                     year: "numeric",
                   })}
                 </p>
-                <p className="mb-12">Pengelola PNBP</p>
+                <p>Pengelola PNBP</p>
+
+                {/* Container QR dengan padding yang pas */}
+                <div className="py-2">
+                  <QRCode
+                    value={qrInvoiceData}
+                    size={80}
+                    level="M"
+                    style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                  />
+                </div>
+
+                {/* Tambahan teks kecil agar sama persis dengan style LHU */}
+                <span className="text-[9px] text-gray-400 mb-1">
+                  Validasi Digital
+                </span>
+
                 <p className="font-bold underline">
                   {currentUser?.fullname ||
                     currentUser?.username ||

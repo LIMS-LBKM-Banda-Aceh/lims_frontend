@@ -2,6 +2,7 @@
 
 import React from "react";
 import kopMailImg from "../assets/kop_mail.png";
+import QRCode from "react-qr-code";
 
 export default function LHUPrintTemplate({ data }) {
   if (!data) return null;
@@ -16,17 +17,19 @@ export default function LHUPrintTemplate({ data }) {
     });
   };
 
-  // DEBUG: Tampilkan data yang diterima
-  console.log("LHU Template Data:", {
-    validator: data.validator,
-    validatorExists: "validator" in data,
-    validated_at: data.validated_at,
-    allDataKeys: Object.keys(data),
-  });
-
   // Ambil validator dari data registrasi
-  // Prioritas: 1. validator dari data, 2. default
   const validatorName = data.validator || "dr. Uzi Mardha Phoenna, Sp.PK";
+
+  // Create QR Value String (Data validasi yang akan muncul saat di-scan)
+  const qrValidationData = JSON.stringify({
+    rs: "BLKM Banda Aceh",
+    reg: data.no_reg,
+    lab_id: data.no_sampel_lab,
+    pasien: data.nama_pasien,
+    status: "VALIDATED",
+    validator: validatorName,
+    date: data.validated_at || new Date().toISOString(),
+  });
 
   return (
     <div className="font-sans text-black max-w-[21cm] mx-auto print:w-full print:max-w-none">
@@ -48,6 +51,7 @@ export default function LHUPrintTemplate({ data }) {
 
       {/* INFO PASIEN TABLE */}
       <div className="grid grid-cols-2 gap-8 text-sm mb-6 break-inside-avoid">
+        {/* ... (Bagian Table Kiri Tetap Sama) ... */}
         <table>
           <tbody>
             <tr>
@@ -74,6 +78,8 @@ export default function LHUPrintTemplate({ data }) {
             </tr>
           </tbody>
         </table>
+
+        {/* ... (Bagian Table Kanan Tetap Sama) ... */}
         <table>
           <tbody>
             <tr>
@@ -148,10 +154,10 @@ export default function LHUPrintTemplate({ data }) {
         </tbody>
       </table>
 
-      {/* FOOTER TTD */}
-      <div className="flex justify-end mt-12 break-inside-avoid page-break-inside-avoid">
-        <div className="text-center">
-          <p className="mb-20">
+      {/* FOOTER TTD & QR CODE */}
+      <div className="flex justify-end mt-8 break-inside-avoid page-break-inside-avoid">
+        <div className="flex flex-col items-center justify-center text-center w-64">
+          <p className="mb-4">
             Aceh Besar,{" "}
             {data.validated_at
               ? formatDate(data.validated_at)
@@ -163,7 +169,21 @@ export default function LHUPrintTemplate({ data }) {
             <br />
             Dokter Penanggung Jawab
           </p>
-          <p className="font-bold text-sm">{validatorName}</p>
+
+          {/* IMPLEMENTASI QR CODE DISINI */}
+          <div className="py-2">
+            <QRCode
+              value={qrValidationData}
+              size={90} // Ukuran pas untuk tanda tangan
+              level="M" // Error correction level
+              style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+            />
+          </div>
+          <span className="text-[9px] text-gray-400 mb-2">
+            Validasi Digital
+          </span>
+
+          <p className="font-bold text-sm underline">{validatorName}</p>
         </div>
       </div>
     </div>
