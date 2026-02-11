@@ -278,7 +278,7 @@ export default function RegistrationForm({ onSuccess }) {
 
   const handleCheckNik = async (nikValue) => {
     // Hanya cek jika panjang NIK = 16
-    if (!nikValue || nikValue.length !== 16) return;
+    if (nikValue?.length !== 16) return;
 
     setCheckingNik(true);
     try {
@@ -347,12 +347,73 @@ export default function RegistrationForm({ onSuccess }) {
     }
   };
 
+  const [isSampleIdAvailable, setIsSampleIdAvailable] = useState(true);
+  const [checkingSampleId, setCheckingSampleId] = useState(false);
+  const [sampleIdMessage, setSampleIdMessage] = useState("");
+
+  useEffect(() => {
+    const checkSampleId = async () => {
+      // Selalu trim saat pengecekan
+      const sampleId = form.no_sampel_lab?.trim();
+
+      if (!sampleId) {
+        setIsSampleIdAvailable(true);
+        setSampleIdMessage("");
+        return;
+      }
+
+      setCheckingSampleId(true);
+      try {
+        // Encode URI component agar karakter spesial (jika ada "/" dsb) aman di URL
+        const safeId = encodeURIComponent(sampleId);
+        const res = await api.get(`/registrations/check-sample-no/${safeId}`);
+
+        if (res.data.available) {
+          setIsSampleIdAvailable(true);
+          setSampleIdMessage("Nomor sampel tersedia ✅");
+        } else {
+          setIsSampleIdAvailable(false);
+          setSampleIdMessage("Nomor sampel sudah digunakan ❌");
+        }
+      } catch (error) {
+        console.error("Gagal cek nomor sampel", error);
+      } finally {
+        setCheckingSampleId(false);
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      if (form.no_sampel_lab) {
+        checkSampleId();
+      }
+    }, 800);
+
+    return () => clearTimeout(timeoutId);
+  }, [form.no_sampel_lab]);
+
   const handleSubmit = async (e) => {
     e.preventDefault(); // ⬅️ WAJIB DI PALING ATAS
 
     // validasi NIK tepat 16 digit
+    e.preventDefault();
+
+    // 1. Validasi NIK
     if (form.nik && form.nik.length !== 16) {
       toast.error("NIK harus berjumlah tepat 16 digit!");
+      return;
+    }
+
+    // 2. BLOCK JIKA SAMPEL ID DUPLIKAT
+    if (!isSampleIdAvailable) {
+      toast.error("Nomor Sampel Lab sudah digunakan! Ganti dengan nomor lain.");
+      // Scroll ke elemen input sampel biar user sadar
+      document.getElementsByName("no_sampel_lab")[0]?.focus();
+      return;
+    }
+
+    // 3. BLOCK JIKA SEDANG CEK (Mencegah race condition)
+    if (checkingSampleId) {
+      toast.info("Sedang memverifikasi nomor sampel...");
       return;
     }
 
@@ -426,6 +487,7 @@ export default function RegistrationForm({ onSuccess }) {
                 name="nik"
                 value={form.nik}
                 type="text"
+                required
                 inputMode="numeric"
                 // Tambahkan onBlur untuk memicu pengecekan saat user pindah field
                 onBlur={(e) => handleCheckNik(e.target.value)}
@@ -622,11 +684,28 @@ export default function RegistrationForm({ onSuccess }) {
                 label="Nomor Sampel Lab"
                 name="no_sampel_lab"
                 value={form.no_sampel_lab}
-                onChange={handleChange}
+                // Ubah input menjadi uppercase secara visual saat mengetik (opsional tapi bagus UX-nya)
+                onChange={(e) => {
+                  // Paksa uppercase di state
+                  handleChange({
+                    target: {
+                      name: "no_sampel_lab",
+                      value: e.target.value.toUpperCase(),
+                    },
+                  });
+                }}
                 required
                 placeholder="Contoh: S-001"
                 icon={FlaskConical}
               />
+              {/* Tampilkan pesan validasi di bawah input */}
+              {form.no_sampel_lab && (
+                <p
+                  className={`text-xs mt-1 ${isSampleIdAvailable ? "text-green-600" : "text-red-600"}`}
+                >
+                  {checkingSampleId ? "Memeriksa..." : sampleIdMessage}
+                </p>
+              )}
             </div>
           </div>
         </div>

@@ -190,7 +190,7 @@ export default function Login() {
               <div className="w-3 h-3 rounded-full bg-green-400"></div>
             </div>
             <h2 className="text-2xl font-bold mb-2">
-              Labolatory Information Management System
+              Laboratory Information Management System
             </h2>
             <p className="text-cyan-100 text-sm leading-relaxed">
               Mengelola ribuan sampel dengan akurasi tinggi dan standar keamanan
