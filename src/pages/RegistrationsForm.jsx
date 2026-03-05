@@ -1,5 +1,5 @@
 // pages/RegistrationForm.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import api from "../api/axios";
 import { toast } from "react-toastify";
 import {
@@ -11,6 +11,7 @@ import {
   Plus,
   Loader2,
   Minus,
+  Settings2,
 } from "lucide-react";
 
 // --- Reusable Components ---
@@ -55,17 +56,36 @@ const FormTextarea = ({ label, ...props }) => (
   </div>
 );
 
-// --- EXAMINATION SELECTOR DENGAN QUANTITY ---
+// --- EXAMINATION SELECTOR ---
 const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const groupedData = masterData.reduce((acc, item) => {
-    if (!acc[item.kategori]) acc[item.kategori] = [];
-    acc[item.kategori].push(item);
+    const groupName = item.nama_instalasi
+      ? item.nama_instalasi.toUpperCase()
+      : "LAINNYA / UMUM";
+
+    if (!acc[groupName]) acc[groupName] = [];
+    acc[groupName].push(item);
     return acc;
   }, {});
 
-  // Fungsi Helper: Cek apakah item sudah dipilih & ambil qty-nya
+  const sortedGroups = Object.entries(groupedData).sort((a, b) => {
+    const groupA = a[0];
+    const groupB = b[0];
+
+    if (groupA === "LAINNYA / UMUM") return 1;
+    if (groupB === "LAINNYA / UMUM") return -1;
+
+    const kodeA = a[1][0]?.kode_sampel || "";
+    const kodeB = b[1][0]?.kode_sampel || "";
+
+    return kodeA.localeCompare(kodeB, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  });
+
   const getItemQty = (id) => {
     const found = selectedItems.find((i) => i.id === id);
     return found ? found.qty : 0;
@@ -74,14 +94,12 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
   const handleAdd = (item) => {
     const existing = selectedItems.find((i) => i.id === item.id);
     if (existing) {
-      // Increment Qty
       onChange(
         selectedItems.map((i) =>
           i.id === item.id ? { ...i, qty: i.qty + 1 } : i,
         ),
       );
     } else {
-      // Add New
       onChange([...selectedItems, { ...item, qty: 1 }]);
     }
   };
@@ -90,14 +108,12 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
     const existing = selectedItems.find((i) => i.id === item.id);
     if (existing) {
       if (existing.qty > 1) {
-        // Decrement Qty
         onChange(
           selectedItems.map((i) =>
             i.id === item.id ? { ...i, qty: i.qty - 1 } : i,
           ),
         );
       } else {
-        // Remove completely if qty becomes 0
         onChange(selectedItems.filter((i) => i.id !== item.id));
       }
     }
@@ -129,7 +145,7 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
         </div>
       </div>
       <div className="max-h-[400px] overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-        {Object.entries(groupedData).map(([category, items]) => {
+        {sortedGroups.map(([groupName, items]) => {
           const filteredItems = items.filter((item) =>
             item.nama_pemeriksaan
               .toLowerCase()
@@ -137,9 +153,9 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
           );
           if (filteredItems.length === 0) return null;
           return (
-            <div key={category}>
+            <div key={groupName}>
               <h4 className="text-xs font-bold text-cyan-700 uppercase tracking-wider mb-2 sticky top-0 bg-gray-50 py-1 z-10">
-                {category}
+                {groupName}
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {filteredItems.map((item) => {
@@ -163,10 +179,13 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
                         </p>
                         <p className="text-xs text-gray-500">
                           {formatRupiah(item.harga)}
+                          {item.kode_sampel && (
+                            <span className="ml-2 text-emerald-600 font-medium">
+                              ({item.kode_sampel})
+                            </span>
+                          )}
                         </p>
                       </div>
-
-                      {/* QUANTITY CONTROLS */}
                       <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1">
                         <button
                           type="button"
@@ -202,7 +221,6 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
     </div>
   );
 };
-
 // --- MAIN COMPONENT ---
 export default function RegistrationForm({ onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -227,23 +245,40 @@ export default function RegistrationForm({ onSuccess }) {
   });
 
   const [checkingNik, setCheckingNik] = useState(false);
+  const [isSampleIdAvailable, setIsSampleIdAvailable] = useState(true);
+  const [checkingSampleId, setCheckingSampleId] = useState(false);
+  const [sampleIdMessage, setSampleIdMessage] = useState("");
 
+  // --- STATE BARU: Base Sequence untuk Penomoran Master ---
+  const [baseSequence, setBaseSequence] = useState("");
+  const [lastSampleString, setLastSampleString] = useState(""); // STATE BARU
+
+  // Fetch Master Data & Inisialisasi Base Sequence HANYA SEKALI saat awal render
   useEffect(() => {
-    const fetchMaster = async () => {
+    const fetchInitialData = async () => {
       try {
-        const res = await api.get("/master/pemeriksaan");
-        if (res.data.success) {
-          setMasterPemeriksaan(res.data.data);
+        const [masterRes, seqRes] = await Promise.all([
+          api.get("/master/pemeriksaan"),
+          api.get("/registrations/next-sample-seq"),
+        ]);
+
+        if (masterRes.data.success) {
+          setMasterPemeriksaan(masterRes.data.data);
+        }
+        if (seqRes.data.success) {
+          setBaseSequence(seqRes.data.next_seq.toString());
+          // SET STATE STRING TERAKHIR
+          setLastSampleString(seqRes.data.last_sample_string);
         }
       } catch (err) {
-        console.error("Gagal load master data", err);
-        toast.error("Gagal memuat daftar harga pemeriksaan");
+        console.error("Gagal load initial data", err);
+        toast.error("Gagal memuat data dari server");
       }
     };
-    fetchMaster();
+    fetchInitialData();
   }, []);
 
-  // Hitung Total Biaya (Support Quantity)
+  // HITUNG TOTAL BIAYA
   useEffect(() => {
     if (form.status_pembayaran === "gratis") {
       setTotalBiaya(0);
@@ -255,6 +290,38 @@ export default function RegistrationForm({ onSuccess }) {
       setTotalBiaya(total);
     }
   }, [selectedItems, form.status_pembayaran]);
+
+  // CARI INSTALASI YANG DIBUTUHKAN (Unique)
+  const requiredInstallations = useMemo(() => {
+    const codes = selectedItems
+      .map((item) => item.kode_sampel || "UMUM")
+      .filter(Boolean);
+
+    // Sort agar urutannya konsisten 1 IMB, 2 IPK, dst.
+    const uniqueCodes = [...new Set(codes)];
+    return uniqueCodes.sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+    );
+  }, [selectedItems]);
+
+  // --- LOGIC PENOMORAN OTOMATIS BERDASARKAN BASE SEQUENCE ---
+  useEffect(() => {
+    const bulan = new Date().getMonth() + 1;
+    const tahun = new Date().getFullYear();
+
+    if (requiredInstallations.length > 0 && baseSequence !== "") {
+      const startNum = parseInt(baseSequence, 10) || 1;
+
+      const parts = requiredInstallations.map((kode) => {
+        const urut = startNum;
+        return `${kode} ${urut} ${bulan} ${tahun}`;
+      });
+
+      setForm((prev) => ({ ...prev, no_sampel_lab: parts.join(", ") }));
+    } else {
+      setForm((prev) => ({ ...prev, no_sampel_lab: "" }));
+    }
+  }, [baseSequence, requiredInstallations]);
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -277,7 +344,6 @@ export default function RegistrationForm({ onSuccess }) {
   }, [form.tgl_lahir]);
 
   const handleCheckNik = async (nikValue) => {
-    // Hanya cek jika panjang NIK = 16
     if (nikValue?.length !== 16) return;
 
     setCheckingNik(true);
@@ -286,11 +352,8 @@ export default function RegistrationForm({ onSuccess }) {
 
       if (res.data.success) {
         if (res.data.found) {
-          // --- KONDISI 1: DATA LAMA DITEMUKAN (Auto Fill) ---
           const patient = res.data.data;
-
           setForm((prev) => {
-            // Hitung ulang umur
             let calculatedAge = "";
             if (patient.tgl_lahir) {
               const today = new Date();
@@ -316,28 +379,18 @@ export default function RegistrationForm({ onSuccess }) {
             };
           });
 
-          toast.success(`Data pasien lama ditemukan: ${patient.nama_pasien}`, {
-            position: "top-right",
-            autoClose: 3000,
-          });
+          toast.success(`Data pasien lama ditemukan: ${patient.nama_pasien}`);
         } else {
-          // --- KONDISI 2: DATA TIDAK DITEMUKAN (Reset Form / Pasien Baru) ---
-          // Ini bagian penting yang sebelumnya hilang!
           setForm((prev) => ({
             ...prev,
             nama_pasien: "",
             tgl_lahir: "",
             umur: "",
-            jenis_kelamin: "L", // Reset ke default
+            jenis_kelamin: "L",
             alamat: "",
             no_kontak: "",
-            // Catatan: Field lain seperti asal_sampel dll dibiarkan sesuai pilihan user
           }));
-
-          toast.info("Pasien belum terdaftar. Silakan isi manual.", {
-            position: "top-right",
-            autoClose: 2000,
-          });
+          toast.info("Pasien belum terdaftar. Silakan isi manual.");
         }
       }
     } catch (error) {
@@ -347,15 +400,9 @@ export default function RegistrationForm({ onSuccess }) {
     }
   };
 
-  const [isSampleIdAvailable, setIsSampleIdAvailable] = useState(true);
-  const [checkingSampleId, setCheckingSampleId] = useState(false);
-  const [sampleIdMessage, setSampleIdMessage] = useState("");
-
   useEffect(() => {
     const checkSampleId = async () => {
-      // Selalu trim saat pengecekan
       const sampleId = form.no_sampel_lab?.trim();
-
       if (!sampleId) {
         setIsSampleIdAvailable(true);
         setSampleIdMessage("");
@@ -364,16 +411,17 @@ export default function RegistrationForm({ onSuccess }) {
 
       setCheckingSampleId(true);
       try {
-        // Encode URI component agar karakter spesial (jika ada "/" dsb) aman di URL
         const safeId = encodeURIComponent(sampleId);
         const res = await api.get(`/registrations/check-sample-no/${safeId}`);
 
         if (res.data.available) {
           setIsSampleIdAvailable(true);
-          setSampleIdMessage("Nomor sampel tersedia ✅");
+          setSampleIdMessage("Semua nomor sampel tersedia ✅");
         } else {
           setIsSampleIdAvailable(false);
-          setSampleIdMessage("Nomor sampel sudah digunakan ❌");
+          setSampleIdMessage(
+            "Terdapat nomor sampel yang bentrok/sudah digunakan ❌",
+          );
         }
       } catch (error) {
         console.error("Gagal cek nomor sampel", error);
@@ -392,26 +440,18 @@ export default function RegistrationForm({ onSuccess }) {
   }, [form.no_sampel_lab]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); // ⬅️ WAJIB DI PALING ATAS
-
-    // validasi NIK tepat 16 digit
     e.preventDefault();
 
-    // 1. Validasi NIK
     if (form.nik && form.nik.length !== 16) {
       toast.error("NIK harus berjumlah tepat 16 digit!");
       return;
     }
 
-    // 2. BLOCK JIKA SAMPEL ID DUPLIKAT
     if (!isSampleIdAvailable) {
-      toast.error("Nomor Sampel Lab sudah digunakan! Ganti dengan nomor lain.");
-      // Scroll ke elemen input sampel biar user sadar
-      document.getElementsByName("no_sampel_lab")[0]?.focus();
+      toast.error("Nomor Sampel Lab sudah digunakan! Ganti nomor urut start.");
       return;
     }
 
-    // 3. BLOCK JIKA SEDANG CEK (Mencegah race condition)
     if (checkingSampleId) {
       toast.info("Sedang memverifikasi nomor sampel...");
       return;
@@ -422,7 +462,11 @@ export default function RegistrationForm({ onSuccess }) {
       return;
     }
 
-    // Payload mengirim 'items' array dengan quantity
+    if (!baseSequence || baseSequence === "") {
+      toast.warning("Mohon isi Nomor Start Urutan Sampel");
+      return;
+    }
+
     const payload = {
       ...form,
       items: selectedItems.map((item) => ({ id: item.id, qty: item.qty })),
@@ -437,22 +481,80 @@ export default function RegistrationForm({ onSuccess }) {
       toast.success("Registrasi berhasil dibuat!");
       if (onSuccess) onSuccess();
 
+      // Refresh urutan untuk pendaftaran berikutnya
+      const seqRes = await api.get("/registrations/next-sample-seq");
+      if (seqRes.data.success) {
+        setBaseSequence(seqRes.data.next_seq.toString());
+        setLastSampleString(seqRes.data.last_sample_string);
+      }
+
       setForm({
         ...form,
         nama_pasien: "",
         nik: "",
+        no_sampel_lab: "",
         waktu_daftar: new Date().toLocaleTimeString("it-IT", {
           hour: "2-digit",
           minute: "2-digit",
         }),
       });
-      setSelectedItems([]); // Reset items
+      setSelectedItems([]);
     } catch (error) {
       console.error(error);
       toast.error(error.response?.data?.message || "Gagal menyimpan data");
     } finally {
       setLoading(false);
     }
+  };
+
+  // --- HELPER UNTUK HIGHLIGHT NOMOR TERAKHIR ---
+  const renderHighlightedSequence = (str) => {
+    // Abaikan jika string kosong atau berupa pesan error dari backend
+    if (
+      !str ||
+      str === "Belum ada data registrasi" ||
+      str === "Error memuat data terakhir"
+    ) {
+      return str;
+    }
+
+    // Pisah berdasarkan koma jika ada lebih dari 1 sampel (misal: "1 IMB 5 2 2026, 2 IPK 5 2 2026")
+    const samples = str.split(",").map((s) => s.trim());
+
+    return samples.map((sample, sIndex) => {
+      const parts = sample.split(" ");
+
+      // Nomor urut selalu berada di posisi ke-3 dari belakang (Kode URUT Bulan Tahun)
+      if (parts.length >= 3) {
+        const seqIndex = parts.length - 3;
+
+        return (
+          <span key={sIndex}>
+            {sIndex > 0 && ", "}
+            {parts.map((part, pIndex) => (
+              <span key={pIndex}>
+                {pIndex === seqIndex ? (
+                  // Style angka urutan disamakan dengan preview (cyan-600 & ditebalkan)
+                  <span className="text-black font-black mx-0.5">
+                    {part}
+                  </span>
+                ) : (
+                  <span className="text-yellow-900">{part}</span>
+                )}
+                {pIndex < parts.length - 1 && " "}
+              </span>
+            ))}
+          </span>
+        );
+      }
+
+      return (
+        <span key={sIndex}>
+          {sIndex > 0 && ", "}
+          {sample}
+        </span>
+      );
+    });
   };
 
   const formatRupiah = (num) =>
@@ -464,7 +566,8 @@ export default function RegistrationForm({ onSuccess }) {
 
   return (
     <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 animate-fade-in">
-      <div className="flex items-center justify-between mb-8 border-b border-gray-100 pb-4">
+      {/* HEADER YANG SUDAH DIUPDATE - Asal Sampel & Status dipindah ke sini */}
+      <div className="flex flex-col md:flex-row md:items-start justify-between mb-8 border-b border-gray-100 pb-4 gap-4">
         <div>
           <h2 className="text-xl font-bold text-gray-800">
             Registrasi Pasien Baru (BLKM)
@@ -472,6 +575,38 @@ export default function RegistrationForm({ onSuccess }) {
           <p className="text-sm text-gray-500 mt-1">
             Lengkapi formulir dan pilih jenis pemeriksaan sesuai SK Retribusi.
           </p>
+        </div>
+
+        <div className="flex flex-row items-end gap-2 p-2 rounded-xl">
+          <FormSelect
+            label="Asal Sampel"
+            name="asal_sampel"
+            value={form.asal_sampel}
+            onChange={(e) => {
+              const newVal = e.target.value;
+              setForm((prev) => ({
+                ...prev,
+                asal_sampel: newVal,
+                status_pembayaran:
+                  newVal === "Mandiri" ? "berbayar" : prev.status_pembayaran,
+              }));
+            }}
+          >
+            <option value="Mandiri">Mandiri (Umum)</option>
+            <option value="Rujukan">Rujukan (Faskes/RS)</option>
+          </FormSelect>
+
+          {form.asal_sampel === "Rujukan" && (
+            <FormSelect
+              label="Status Pembayaran"
+              name="status_pembayaran"
+              value={form.status_pembayaran}
+              onChange={handleChange}
+            >
+              <option value="berbayar">Berbayar</option>
+              <option value="gratis">Tidak Berbayar / Program</option>
+            </FormSelect>
+          )}
         </div>
       </div>
 
@@ -489,20 +624,14 @@ export default function RegistrationForm({ onSuccess }) {
                 type="text"
                 required
                 inputMode="numeric"
-                // Tambahkan onBlur untuk memicu pengecekan saat user pindah field
                 onBlur={(e) => handleCheckNik(e.target.value)}
                 onChange={(e) => {
                   const rawValue = e.target.value;
-                  if (/\D/.test(rawValue)) {
-                    // ... logic toast warning angka
-                  }
                   const cleanValue = rawValue.replace(/\D/g, "");
                   if (cleanValue.length <= 16) {
                     handleChange({
                       target: { name: "nik", value: cleanValue },
                     });
-
-                    // Opsional: Auto trigger jika sudah pas 16 digit saat mengetik
                     if (cleanValue.length === 16) {
                       handleCheckNik(cleanValue);
                     }
@@ -510,8 +639,6 @@ export default function RegistrationForm({ onSuccess }) {
                 }}
                 placeholder="16 digit NIK"
               />
-
-              {/* Indikator Loading di sebelah kanan dalam input */}
               {checkingNik && (
                 <div className="absolute top-[34px] right-3">
                   <Loader2 className="animate-spin text-cyan-600" size={18} />
@@ -580,7 +707,6 @@ export default function RegistrationForm({ onSuccess }) {
           </h3>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Bagian Kiri: Selector dengan Quantity */}
             <div className="lg:col-span-2">
               <ExaminationSelector
                 masterData={masterPemeriksaan}
@@ -589,7 +715,6 @@ export default function RegistrationForm({ onSuccess }) {
               />
             </div>
 
-            {/* Bagian Kanan: Summary Biaya & Info Sampel */}
             <div className="space-y-4">
               <div className="bg-cyan-50 p-4 rounded-xl border border-cyan-100 flex flex-col h-auto">
                 <div>
@@ -601,7 +726,6 @@ export default function RegistrationForm({ onSuccess }) {
                   </p>
                 </div>
 
-                {/* DAFTAR ITEM YANG DIPILIH */}
                 {selectedItems.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-cyan-200/50">
                     <p className="text-[10px] uppercase font-bold text-cyan-800 mb-2">
@@ -637,42 +761,8 @@ export default function RegistrationForm({ onSuccess }) {
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* 1. Pilihan Asal Sampel */}
-                <FormSelect
-                  label="Asal Sampel"
-                  name="asal_sampel"
-                  value={form.asal_sampel}
-                  onChange={(e) => {
-                    const newVal = e.target.value;
-                    setForm((prev) => ({
-                      ...prev,
-                      asal_sampel: newVal,
-                      status_pembayaran:
-                        newVal === "Mandiri"
-                          ? "berbayar"
-                          : prev.status_pembayaran,
-                    }));
-                  }}
-                >
-                  <option value="Mandiri">Mandiri (Umum)</option>
-                  <option value="Rujukan">Rujukan (Faskes/RS)</option>
-                </FormSelect>
 
-                {/* 2. Opsi Status Pembayaran */}
-                {form.asal_sampel === "Rujukan" && (
-                  <FormSelect
-                    label="Status Pembayaran"
-                    name="status_pembayaran"
-                    value={form.status_pembayaran}
-                    onChange={handleChange}
-                  >
-                    <option value="berbayar">Berbayar</option>
-                    <option value="gratis">Tidak Berbayar / Program</option>
-                  </FormSelect>
-                )}
-              </div>
-
+              {/* INPUT PENGIRIM INSTANSI SEKARANG BERDIRI SENDIRI DI SINI */}
               <FormInput
                 label="Pengirim/Instansi"
                 name="pengirim_instansi"
@@ -680,32 +770,88 @@ export default function RegistrationForm({ onSuccess }) {
                 onChange={handleChange}
                 placeholder="Jika ada"
               />
-              <FormInput
-                label="Nomor Sampel Lab"
-                name="no_sampel_lab"
-                value={form.no_sampel_lab}
-                // Ubah input menjadi uppercase secara visual saat mengetik (opsional tapi bagus UX-nya)
-                onChange={(e) => {
-                  // Paksa uppercase di state
-                  handleChange({
-                    target: {
-                      name: "no_sampel_lab",
-                      value: e.target.value.toUpperCase(),
-                    },
-                  });
-                }}
-                required
-                placeholder="Contoh: S-001"
-                icon={FlaskConical}
-              />
-              {/* Tampilkan pesan validasi di bawah input */}
-              {form.no_sampel_lab && (
-                <p
-                  className={`text-xs mt-1 ${isSampleIdAvailable ? "text-green-600" : "text-red-600"}`}
-                >
-                  {checkingSampleId ? "Memeriksa..." : sampleIdMessage}
-                </p>
-              )}
+
+              {/* === PANEL GENERATE NOMOR SAMPEL TERPUSAT === */}
+              <div className="space-y-3 bg-white p-4 border border-gray-200 rounded-xl shadow-sm">
+                <label className="text-sm font-bold text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-2">
+                  <Settings2 size={16} className="text-cyan-600" />
+                  Konfigurasi Nomor Sampel
+                </label>
+
+                {/* INFO NOMOR TERAKHIR */}
+                <div className="bg-yellow-50/80 border border-yellow-200 rounded-lg p-2.5 mb-2 shadow-sm">
+                  <p className="text-[10px] text-yellow-700 font-bold uppercase mb-0.5">
+                    Riwayat Nomor Terakhir Database:
+                  </p>
+                  <p className="text-xs font-mono font-medium wrap-break-word leading-tight items-center flex flex-wrap">
+                    {renderHighlightedSequence(lastSampleString)} 
+                  </p>
+                </div>
+
+                {/* Input Khusus Start Nomor Urut */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-gray-600">
+                    Start Nomor Urut Baru (Bisa diubah manual)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none text-sm font-bold"
+                    value={baseSequence}
+                    onChange={(e) =>
+                      setBaseSequence(e.target.value.replace(/\D/g, ""))
+                    }
+                    placeholder="Masukkan Angka..."
+                  />
+                </div>
+
+                {requiredInstallations.length === 0 ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-500 text-center italic">
+                    Pilih item pemeriksaan di sebelah kiri untuk melihat preview
+                    nomor
+                  </div>
+                ) : (
+                  <div className="space-y-2 mt-2">
+                    <p className="text-[11px] font-medium text-gray-500">
+                      Preview {requiredInstallations.length} Tabung/Sampel Fisik
+                      (Otomatis):
+                    </p>
+
+                    {/* Hasil Generate Label (Read-Only UI) */}
+                    <div className="flex flex-wrap gap-2">
+                      {requiredInstallations.map((kode, index) => {
+                        const startNum = parseInt(baseSequence, 10) || 1;
+                        return (
+                          <div
+                            key={kode}
+                            className="bg-cyan-50 border border-cyan-200 text-cyan-800 px-3 py-1.5 rounded-md text-xs font-bold font-mono shadow-sm"
+                          >
+                            {kode}{" "}
+                            <span className="text-cyan-600">{startNum}</span>{" "}
+                            {new Date().getMonth() + 1}{" "}
+                            {new Date().getFullYear()}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pesan ketersediaan database */}
+                {form.no_sampel_lab && (
+                  <div className="flex flex-col mt-2 pt-2 border-t border-gray-100">
+                    <span
+                      className={`text-xs font-medium flex items-center gap-1 ${
+                        isSampleIdAvailable ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      {checkingSampleId
+                        ? "Memeriksa ketersediaan DB..."
+                        : sampleIdMessage}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

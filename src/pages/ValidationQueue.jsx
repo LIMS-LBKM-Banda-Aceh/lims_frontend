@@ -1,7 +1,5 @@
-// src/pages/ValidationQueue.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import api from "../api/axios";
-
 import {
   FileCheck,
   Search,
@@ -13,7 +11,6 @@ import {
   X,
   Eye,
   RefreshCw,
-  ArrowRight,
   User,
   Clock,
   ArrowUpDown,
@@ -22,26 +19,87 @@ import {
   ChevronRight,
   ChevronDown,
   Microscope,
-  Edit2, 
-  Save, 
-  XCircle, 
+  Edit2,
+  Save,
+  XCircle,
+  ArrowUp,
+  ArrowDown,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "react-toastify";
 
+// --- UI/UX HELPER: Digunakan untuk memberi warna di tabel validasi ---
+export const analyzeResult = (nilai, rujukan) => {
+  if (!nilai || !rujukan) return "normal";
+
+  const valStr = String(nilai).trim().toLowerCase();
+  const refStr = String(rujukan).trim().toLowerCase();
+
+  // 1. Kualitatif (Teks)
+  if (
+    ["negatif", "positif", "normal", "reaktif", "non reaktif"].some((kw) =>
+      refStr.includes(kw),
+    )
+  ) {
+    if (refStr.includes("negatif") && !valStr.includes("negatif"))
+      return "abnormal";
+    if (refStr.includes("non reaktif") && !valStr.includes("non reaktif"))
+      return "abnormal";
+    if (refStr.includes("normal") && !valStr.includes("normal"))
+      return "abnormal";
+    return "normal";
+  }
+
+  // 2. Kuantitatif (Angka)
+  // Konversi koma desimal, pastikan hanya angka dan titik saja yg di-parse
+  const valNum = parseFloat(valStr.replace(/,/g, ".").replace(/[^0-9.-]/g, ""));
+  if (isNaN(valNum)) return "normal";
+
+  if (refStr.includes("<")) {
+    const refNum = parseFloat(
+      refStr.replace(/[^0-9.,]/g, "").replace(/,/g, "."),
+    );
+    if (!isNaN(refNum) && valNum > refNum) return "high";
+  }
+
+  if (refStr.includes(">")) {
+    const refNum = parseFloat(
+      refStr.replace(/[^0-9.,]/g, "").replace(/,/g, "."),
+    );
+    if (!isNaN(refNum) && valNum < refNum) return "low";
+  }
+
+  // Cek Range (Memperbaiki kegagalan split akibat en-dash, em-dash, tilde, atau minus unicode)
+  const rangeRegex = /[-–—−~]|s\/d|sampai|to/i;
+  if (rangeRegex.test(refStr)) {
+    const parts = refStr
+      .split(rangeRegex)
+      .map((p) => parseFloat(p.replace(/[^0-9.,]/g, "").replace(/,/g, ".")))
+      .filter((n) => !isNaN(n));
+
+    if (parts.length >= 2) {
+      const min = Math.min(parts[0], parts[1]);
+      const max = Math.max(parts[0], parts[1]);
+      if (valNum < min) return "low";
+      if (valNum > max) return "high";
+    }
+  }
+
+  return "normal";
+};
+// -----------------------------------------------------
+
 export default function ValidationQueue({ onRefreshStats }) {
-  // --- EXISTING LOGIC & STATE ---
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [previewData, setPreviewData] = useState(null);
   const [processingAcc, setProcessingAcc] = useState(false);
 
-  // --- NEW STATE FOR EDITING ---
   const [editingTestId, setEditingTestId] = useState(null);
   const [editValue, setEditValue] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  // --- NEW STATE FOR SORTING & PAGINATION ---
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState("newest");
@@ -65,7 +123,6 @@ export default function ValidationQueue({ onRefreshStats }) {
     try {
       const res = await api.get("/registrations");
       if (res.data.success) {
-        // Filter hanya data dengan status "selesai_uji"
         const waitingValidation = res.data.data.filter(
           (item) => item.status === "selesai_uji",
         );
@@ -87,7 +144,6 @@ export default function ValidationQueue({ onRefreshStats }) {
     setCurrentPage(1);
   }, [searchTerm, itemsPerPage]);
 
-  // --- LOGIKA FILTER + SORT + PAGINATION ---
   const processedData = useMemo(() => {
     let filtered = data.filter(
       (item) =>
@@ -126,7 +182,6 @@ export default function ValidationQueue({ onRefreshStats }) {
 
   const totalPages = Math.ceil(processedData.length / itemsPerPage);
 
-  // --- HANDLERS ---
   const handleOpenPreview = async (id) => {
     const toastId = toast.loading("Memuat rincian hasil...");
     try {
@@ -151,7 +206,6 @@ export default function ValidationQueue({ onRefreshStats }) {
     }
   };
 
-  // --- HANDLER BARU: EDIT RESULT ---
   const handleStartEdit = (test) => {
     setEditingTestId(test.id);
     setEditValue(test.nilai);
@@ -170,22 +224,18 @@ export default function ValidationQueue({ onRefreshStats }) {
 
     setIsSavingEdit(true);
     try {
-      // Panggil endpoint update result
       const res = await api.put(`/tests/${testId}/result`, {
         nilai: editValue,
       });
 
       if (res.data.success) {
         toast.success("Hasil berhasil diperbarui");
-
-        // Update state lokal (previewData) agar UI berubah tanpa reload
         setPreviewData((prev) => ({
           ...prev,
           tests: prev.tests.map((t) =>
             t.id === testId ? { ...t, nilai: editValue } : t,
           ),
         }));
-
         setEditingTestId(null);
       }
     } catch (error) {
@@ -198,8 +248,6 @@ export default function ValidationQueue({ onRefreshStats }) {
 
   const handleApprove = async () => {
     if (!previewData) return;
-
-    // Pastikan tidak ada yang sedang diedit
     if (editingTestId) {
       toast.warning("Selesaikan edit data terlebih dahulu");
       return;
@@ -228,7 +276,6 @@ export default function ValidationQueue({ onRefreshStats }) {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in p-2 md:p-0">
-      {/* --- HEADER SECTION --- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600">
@@ -244,9 +291,7 @@ export default function ValidationQueue({ onRefreshStats }) {
           </div>
         </div>
 
-        {/* Controls Area */}
         <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-          {/* SORTING DROPDOWN */}
           <div className="relative group w-full md:w-40">
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
               <ArrowUpDown size={16} />
@@ -268,8 +313,8 @@ export default function ValidationQueue({ onRefreshStats }) {
 
           <div className="relative flex-1 md:w-64 w-full">
             <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
               size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
             />
             <input
               type="text"
@@ -289,7 +334,6 @@ export default function ValidationQueue({ onRefreshStats }) {
         </div>
       </div>
 
-      {/* --- TABLE CARD --- */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto min-h-[300px]">
           <table className="w-full text-left text-sm">
@@ -345,7 +389,6 @@ export default function ValidationQueue({ onRefreshStats }) {
                     key={item.id}
                     className="hover:bg-emerald-50/20 transition-colors group"
                   >
-                    {/* Kolom 1: Info Pasien */}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500 border border-gray-200 group-hover:border-emerald-200 transition-all shrink-0">
@@ -363,12 +406,10 @@ export default function ValidationQueue({ onRefreshStats }) {
                         </div>
                       </div>
                     </td>
-
-                    {/* Kolom 2: Detail Lab */}
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-1.5 text-gray-700 text-xs font-semibold">
-                          <Microscope size={14} className="text-emerald-500" />
+                          <Microscope size={14} className="text-emerald-500" />{" "}
                           ID Lab:{" "}
                           <span className="font-mono">
                             {item.no_sampel_lab || "-"}
@@ -378,24 +419,16 @@ export default function ValidationQueue({ onRefreshStats }) {
                           <Calendar size={12} />
                           {new Date(item.created_at).toLocaleDateString(
                             "id-ID",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            },
+                            { day: "numeric", month: "short", year: "numeric" },
                           )}
                         </div>
                       </div>
                     </td>
-
-                    {/* Kolom 3: Status */}
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] uppercase font-bold tracking-wide border bg-yellow-50 text-yellow-700 border-yellow-200">
                         <Clock size={12} /> MENUNGGU VALIDASI
                       </span>
                     </td>
-
-                    {/* Kolom 4: Aksi */}
                     <td className="px-6 py-4 text-center">
                       <button
                         onClick={() => handleOpenPreview(item.id)}
@@ -411,10 +444,9 @@ export default function ValidationQueue({ onRefreshStats }) {
           </table>
         </div>
 
-        {/* --- FOOTER --- */}
+        {/* FOOTER PAGINATION */}
         {!loading && processedData.length > 0 && (
           <div className="bg-gray-50/50 px-6 py-4 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-bold text-gray-500">
-            {/* Left: Total */}
             <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
               <span className="whitespace-nowrap">
                 Total: {processedData.length} Data
@@ -441,8 +473,6 @@ export default function ValidationQueue({ onRefreshStats }) {
                 </div>
               </div>
             </div>
-
-            {/* Right: Pagination */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -468,11 +498,10 @@ export default function ValidationQueue({ onRefreshStats }) {
         )}
       </div>
 
-      {/* --- MODAL PREVIEW & ACC --- */}
+      {/* MODAL PREVIEW & ACC */}
       {previewData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            {/* Modal Header */}
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-emerald-50">
               <div>
                 <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
@@ -494,9 +523,7 @@ export default function ValidationQueue({ onRefreshStats }) {
               </button>
             </div>
 
-            {/* Modal Content */}
             <div className="flex-1 overflow-y-auto p-6 bg-white space-y-6">
-              {/* Info Pasien Card */}
               <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8">
                 <div>
                   <p className="text-[10px] uppercase font-bold text-gray-400 mb-0.5">
@@ -528,9 +555,7 @@ export default function ValidationQueue({ onRefreshStats }) {
                     })}
                   </p>
                 </div>
-
                 <div className="col-span-2 md:col-span-3 h-px bg-emerald-200/50 my-1"></div>
-
                 <div className="flex flex-col gap-1">
                   <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1">
                     <PlayCircle size={10} className="text-orange-500" /> Waktu
@@ -576,7 +601,6 @@ export default function ValidationQueue({ onRefreshStats }) {
                 </div>
               </div>
 
-              {/* Tabel Hasil dengan FITUR EDIT */}
               <div>
                 <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm">
                   <FileText size={16} className="text-emerald-600" /> Detail
@@ -596,108 +620,155 @@ export default function ValidationQueue({ onRefreshStats }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {previewData.tests?.map((test, idx) => (
-                        <tr
-                          key={idx}
-                          className="hover:bg-gray-50 transition-colors"
-                        >
-                          <td className="px-5 py-3 font-semibold text-gray-700">
-                            {test.parameter_name}
-                          </td>
+                      {previewData.tests?.map((test, idx) => {
+                        // Implementasi UX Abnormal Disini
+                        const status = analyzeResult(
+                          test.nilai,
+                          test.nilai_rujukan,
+                        );
+                        const isAbnormal = status !== "normal";
 
-                          {/* KOLOM HASIL YANG BISA DIEDIT */}
-                          <td className="px-5 py-3 text-center font-bold text-gray-900 bg-emerald-50/30">
-                            {editingTestId === test.id ? (
-                              <div className="flex items-center gap-2 justify-center">
-                                <input
-                                  type="text"
-                                  value={editValue}
-                                  onChange={(e) => setEditValue(e.target.value)}
-                                  className="w-full max-w-[120px] px-2 py-1 text-sm border border-emerald-400 rounded focus:ring-2 focus:ring-emerald-200 outline-none text-center bg-white"
-                                  autoFocus
-                                />
-                                <button
-                                  onClick={() => handleSaveEdit(test.id)}
-                                  disabled={isSavingEdit}
-                                  className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-                                >
-                                  {isSavingEdit ? (
-                                    <Loader2
-                                      size={14}
-                                      className="animate-spin"
-                                    />
-                                  ) : (
-                                    <Save size={14} />
-                                  )}
-                                </button>
-                                <button
-                                  onClick={handleCancelEdit}
-                                  disabled={isSavingEdit}
-                                  className="p-1.5 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300"
-                                >
-                                  <XCircle size={14} />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-between group/cell">
-                                <span className="flex-1 text-center text-base">
-                                  {test.nilai}
-                                </span>
-                                <button
-                                  onClick={() => handleStartEdit(test)}
-                                  className="opacity-0 group-hover/cell:opacity-100 p-1 text-gray-400 hover:text-emerald-600 transition-opacity"
-                                  title="Edit Nilai"
-                                >
-                                  <Edit2 size={14} />
-                                </button>
-                              </div>
-                            )}
-                          </td>
+                        return (
+                          <tr
+                            key={idx}
+                            className={`hover:bg-gray-50 transition-colors ${isAbnormal ? "bg-red-50/30" : ""}`}
+                          >
+                            <td className="px-5 py-3 font-semibold text-gray-700">
+                              {test.parameter_name}
+                            </td>
 
-                          <td className="px-5 py-3 text-gray-500 text-xs">
-                            {test.satuan}
-                          </td>
-                          <td className="px-5 py-3 text-gray-500 text-xs">
-                            {test.nilai_rujukan}
-                          </td>
-                          <td className="px-5 py-3 text-gray-500 text-xs italic">
-                            {test.metode}
-                          </td>
-                        </tr>
-                      ))}
+                            {/* KOLOM HASIL YANG BISA DIEDIT & HIGHLIGHT ABNORMAL */}
+                            <td
+                              className={`px-5 py-3 text-center transition-colors ${
+                                isAbnormal
+                                  ? "bg-red-100/50"
+                                  : "bg-emerald-50/30"
+                              }`}
+                            >
+                              {editingTestId === test.id ? (
+                                <div className="flex items-center gap-2 justify-center">
+                                  <input
+                                    type="text"
+                                    value={editValue}
+                                    onChange={(e) =>
+                                      setEditValue(e.target.value)
+                                    }
+                                    className="w-full max-w-[120px] px-2 py-1 text-sm border border-emerald-400 rounded focus:ring-2 focus:ring-emerald-200 outline-none text-center bg-white"
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => handleSaveEdit(test.id)}
+                                    disabled={isSavingEdit}
+                                    className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                                  >
+                                    {isSavingEdit ? (
+                                      <Loader2
+                                        size={14}
+                                        className="animate-spin"
+                                      />
+                                    ) : (
+                                      <Save size={14} />
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={handleCancelEdit}
+                                    disabled={isSavingEdit}
+                                    className="p-1.5 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300"
+                                  >
+                                    <XCircle size={14} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-between group/cell relative">
+                                  <span
+                                    className={`flex-1 flex items-center justify-center gap-1.5 text-base ${
+                                      isAbnormal
+                                        ? "text-red-600 font-extrabold"
+                                        : "text-gray-900 font-bold"
+                                    }`}
+                                  >
+                                    {test.nilai}
+                                    {status === "high" && (
+                                      <ArrowUp
+                                        size={16}
+                                        className="text-red-500 stroke-[3px]"
+                                      />
+                                    )}
+                                    {status === "low" && (
+                                      <ArrowDown
+                                        size={16}
+                                        className="text-red-500 stroke-[3px]"
+                                      />
+                                    )}
+                                    {status === "abnormal" && (
+                                      <AlertCircle
+                                        size={16}
+                                        className="text-red-500 stroke-[3px]"
+                                      />
+                                    )}
+                                  </span>
+                                  <button
+                                    onClick={() => handleStartEdit(test)}
+                                    className="opacity-75 md:opacity-0 group-hover/cell:opacity-100 p-1 text-gray-400 hover:text-emerald-600 transition-opacity absolute right-0"
+                                    title="Edit Nilai"
+                                  >
+                                    <Edit2 size={14} />
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+
+                            <td className="px-5 py-3 text-gray-500 text-xs">
+                              {test.satuan}
+                            </td>
+                            <td className="px-5 py-3 text-gray-500 text-xs">
+                              {test.nilai_rujukan}
+                            </td>
+                            <td className="px-5 py-3 text-gray-500 text-xs italic">
+                              {test.metode}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setPreviewData(null);
-                  setEditingTestId(null);
-                }}
-                className="px-6 py-2.5 rounded-xl border border-gray-300 text-gray-600 font-bold text-sm hover:bg-white hover:shadow-sm transition-all"
-              >
-                Tutup
-              </button>
-
-              <button
-                onClick={handleApprove}
-                disabled={processingAcc || editingTestId !== null}
-                className="px-6 py-2.5 rounded-xl bg-linear-to-r from-emerald-600 to-green-600 text-white font-bold text-sm hover:shadow-lg hover:shadow-emerald-200 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {processingAcc ? (
-                  <>
-                    <Loader2 className="animate-spin" size={16} /> Memproses...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 size={18} /> ACC & Terbitkan LHU
-                  </>
-                )}
-              </button>
+            <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-between items-center">
+              <div className="text-xs text-gray-500 italic flex items-center gap-1">
+                <AlertCircle size={14} className="text-red-500" />
+                Hasil <span className="text-red-600 font-bold">merah</span>{" "}
+                menandakan nilai di luar batas normal.
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setPreviewData(null);
+                    setEditingTestId(null);
+                  }}
+                  className="px-6 py-2.5 rounded-xl border border-gray-300 text-gray-600 font-bold text-sm hover:bg-white hover:shadow-sm transition-all"
+                >
+                  Tutup
+                </button>
+                <button
+                  onClick={handleApprove}
+                  disabled={processingAcc || editingTestId !== null}
+                  className="px-6 py-2.5 rounded-xl bg-linear-to-r from-emerald-600 to-green-600 text-white font-bold text-sm hover:shadow-lg hover:shadow-emerald-200 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {processingAcc ? (
+                    <>
+                      <Loader2 className="animate-spin" size={16} />{" "}
+                      Memproses...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={18} /> ACC & Terbitkan LHU
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

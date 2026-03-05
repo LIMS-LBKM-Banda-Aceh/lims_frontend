@@ -14,7 +14,7 @@ import {
   Calendar,
   ListFilter,
   ArrowRight,
-
+  AlertCircle,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
@@ -82,8 +82,7 @@ export default function RegistrationList({
 
     let result = [...data];
 
-    // Jika di dashboard, kita asumsikan data yang masuk sudah "Terbaru" (slice 5)
-    // Jadi kita skip logic filter/sort agar performa lebih cepat dan sesuai urutan dashboard
+    // Jika di dashboard, skip filter/sort agar performa lebih cepat
     if (isDashboard) {
       return result;
     }
@@ -100,15 +99,21 @@ export default function RegistrationList({
       );
     }
 
-    // 2. Sorting
+    // 2. Sorting (BEST PRACTICE - FIXED)
     result.sort((a, b) => {
-      const dateA = new Date(a.tgl_daftar || 0);
-      const dateB = new Date(b.tgl_daftar || 0);
+      // PERUBAHAN DISINI: Gunakan 'created_at' sebagai prioritas utama karena ada jam & menitnya.
+      // Kita beri fallback ke 'tgl_daftar' just in case data lamanya tidak punya created_at.
+      const dateA = new Date(a?.created_at || a?.tgl_daftar).getTime();
+      const dateB = new Date(b?.created_at || b?.tgl_daftar).getTime();
+
+      // Fallback ke 0 jika tanggal Invalid (menghasilkan NaN)
+      const timeA = Number.isNaN(dateA) ? 0 : dateA;
+      const timeB = Number.isNaN(dateB) ? 0 : dateB;
 
       if (sortOrder === "asc") {
-        return dateA - dateB;
+        return timeA - timeB; // Terlama (dari yang paling kecil/lama)
       } else {
-        return dateB - dateA;
+        return timeB - timeA; // Terbaru (dari yang paling besar/baru)
       }
     });
 
@@ -285,7 +290,9 @@ export default function RegistrationList({
                             <span>{item.umur ? `${item.umur} Th` : "-"}</span>
                             <span className="w-1 h-1 rounded-full bg-gray-300"></span>
                             <span>
-                              {item.jenis_kelamin === "L" ? "Lk" : "Pr"}
+                              {item.jenis_kelamin === "L"
+                                ? "Laki-Laki"
+                                : "Perempuan"}
                             </span>
                           </div>
                         </div>
@@ -294,13 +301,28 @@ export default function RegistrationList({
 
                     {/* Kolom 2: No Reg */}
                     <td className="px-6 py-4">
-                      <div className="flex flex-col items-start gap-1">
-                        <span className="font-mono text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
-                          {item.no_reg}
-                        </span>
+                      <div className="flex flex-col items-start gap-1.5">
+                        {/* Gunakan flex-wrap agar responsif di layar kecil */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+                            {item.no_reg}
+                          </span>
+
+                          {/* --- UX IMPROVEMENT: Badge Notice Invoice Kosong --- */}
+                          {!item.no_invoice && (
+                            <span
+                              className="flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 px-1.5 py-[2px] rounded text-[9px] font-extrabold tracking-wide cursor-help shadow-sm"
+                              title="Perhatian: Nomor Invoice belum diset / disimpan!"
+                            >
+                              <AlertCircle size={10} strokeWidth={2.5} /> NO INV
+                            </span>
+                          )}
+                          {/* --------------------------------------------------- */}
+                        </div>
+
                         <div className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
-                          Lab:{" "}
-                          <span className="text-gray-600">
+                          No Sampel:{" "}
+                          <span className="text-gray-600 font-semibold">
                             {item.no_sampel_lab || "-"}
                           </span>
                         </div>

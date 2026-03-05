@@ -1,5 +1,5 @@
 // pages/RegistrationEdit.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import api from "../api/axios";
 import { toast } from "react-toastify";
 import { useNavigate, useParams } from "react-router-dom";
@@ -14,9 +14,11 @@ import {
   Building2,
   Plus,
   Minus,
+  Settings2,
+  Loader2,
 } from "lucide-react";
 
-// --- Form Components (Tidak Berubah) ---
+// --- Form Components ---
 const FormInput = ({
   label,
   type = "text",
@@ -56,15 +58,35 @@ const FormSelect = ({ label, children, ...props }) => (
   </div>
 );
 
-// --- EXAMINATION SELECTOR DENGAN QUANTITY ---
+// --- EXAMINATION SELECTOR (Synced with Form) ---
 const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const groupedData = masterData.reduce((acc, item) => {
-    if (!acc[item.kategori]) acc[item.kategori] = [];
-    acc[item.kategori].push(item);
+    const groupName = item.nama_instalasi
+      ? item.nama_instalasi.toUpperCase()
+      : "LAINNYA / UMUM";
+
+    if (!acc[groupName]) acc[groupName] = [];
+    acc[groupName].push(item);
     return acc;
   }, {});
+
+  const sortedGroups = Object.entries(groupedData).sort((a, b) => {
+    const groupA = a[0];
+    const groupB = b[0];
+
+    if (groupA === "LAINNYA / UMUM") return 1;
+    if (groupB === "LAINNYA / UMUM") return -1;
+
+    const kodeA = a[1][0]?.kode_sampel || "";
+    const kodeB = b[1][0]?.kode_sampel || "";
+
+    return kodeA.localeCompare(kodeB, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  });
 
   const getItemQty = (id) => {
     const found = selectedItems.find((i) => Number(i.id) === Number(id));
@@ -73,13 +95,13 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
 
   const handleAdd = (item) => {
     const existing = selectedItems.find(
-      (i) => Number(i.id) === Number(item.id)
+      (i) => Number(i.id) === Number(item.id),
     );
     if (existing) {
       onChange(
         selectedItems.map((i) =>
-          Number(i.id) === Number(item.id) ? { ...i, qty: i.qty + 1 } : i
-        )
+          Number(i.id) === Number(item.id) ? { ...i, qty: i.qty + 1 } : i,
+        ),
       );
     } else {
       onChange([...selectedItems, { ...item, qty: 1 }]);
@@ -88,14 +110,14 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
 
   const handleRemove = (item) => {
     const existing = selectedItems.find(
-      (i) => Number(i.id) === Number(item.id)
+      (i) => Number(i.id) === Number(item.id),
     );
     if (existing) {
       if (existing.qty > 1) {
         onChange(
           selectedItems.map((i) =>
-            Number(i.id) === Number(item.id) ? { ...i, qty: i.qty - 1 } : i
-          )
+            Number(i.id) === Number(item.id) ? { ...i, qty: i.qty - 1 } : i,
+          ),
         );
       } else {
         onChange(selectedItems.filter((i) => Number(i.id) !== Number(item.id)));
@@ -128,19 +150,19 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
         </div>
       </div>
       <div className="max-h-[500px] overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-        {Object.entries(groupedData).map(([category, items]) => {
+        {sortedGroups.map(([groupName, items]) => {
           const filteredItems = items.filter((item) =>
             item.nama_pemeriksaan
               .toLowerCase()
-              .includes(searchTerm.toLowerCase())
+              .includes(searchTerm.toLowerCase()),
           );
           if (filteredItems.length === 0) return null;
           return (
-            <div key={category}>
+            <div key={groupName}>
               <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 sticky top-0 bg-white py-1 z-10">
-                {category}
+                {groupName}
               </h4>
-              <div className="grid grid-cols-1 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {filteredItems.map((item) => {
                   const qty = getItemQty(item.id);
                   const isSelected = qty > 0;
@@ -162,6 +184,11 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
                         </p>
                         <p className="text-[10px] text-gray-500">
                           {formatRupiah(item.harga)}
+                          {item.kode_sampel && (
+                            <span className="ml-2 text-emerald-600 font-medium">
+                              ({item.kode_sampel})
+                            </span>
+                          )}
                         </p>
                       </div>
 
@@ -212,11 +239,15 @@ export default function RegistrationEdit() {
 
   // State Master Data
   const [masterPemeriksaan, setMasterPemeriksaan] = useState([]);
-
-  // State Items (Array Object)
   const [selectedItems, setSelectedItems] = useState([]);
-
   const [totalBiaya, setTotalBiaya] = useState(0);
+
+  // State Nomor Sampel
+  const [baseSequence, setBaseSequence] = useState("");
+  const [lastSampleString, setLastSampleString] = useState("");
+  const [isSampleIdAvailable, setIsSampleIdAvailable] = useState(true);
+  const [checkingSampleId, setCheckingSampleId] = useState(false);
+  const [sampleIdMessage, setSampleIdMessage] = useState("");
 
   // --- STATE FORM UTAMA ---
   const [form, setForm] = useState({
@@ -244,30 +275,32 @@ export default function RegistrationEdit() {
     const initData = async () => {
       setLoading(true);
       try {
-        // 1. Load Master Data
-        const masterRes = await api.get("/master/pemeriksaan");
+        const [masterRes, seqRes, res] = await Promise.all([
+          api.get("/master/pemeriksaan"),
+          api.get("/registrations/next-sample-seq"),
+          api.get(`/registrations/${id}`),
+        ]);
+
         let masterList = [];
         if (masterRes.data.success) {
           masterList = masterRes.data.data;
           setMasterPemeriksaan(masterList);
         }
 
-        // 2. Load Registration Data
-        const res = await api.get(`/registrations/${id}`);
-        const data = res.data.data;
+        if (seqRes.data.success) {
+          setLastSampleString(seqRes.data.last_sample_string);
+        }
 
+        const data = res.data.data;
         const formatDate = (d) =>
           d ? new Date(d).toISOString().split("T")[0] : "";
-
-        // [FIX] Format Jam: Ambil hanya 5 karakter pertama (HH:mm)
-        // Format dari DB biasanya HH:mm:ss, kita ubah jadi HH:mm agar input type="time" bersih
         const formatTime = (t) => (t && t.length >= 5 ? t.substring(0, 5) : "");
 
         setForm({
           ...data,
           tgl_lahir: formatDate(data.tgl_lahir),
           tgl_daftar: formatDate(data.tgl_daftar),
-          waktu_daftar: formatTime(data.waktu_daftar), // FIX DISINI
+          waktu_daftar: formatTime(data.waktu_daftar),
           tgl_pengambilan: formatDate(data.tgl_pengambilan),
           catatan_tambahan: data.catatan_tambahan || "",
           pengirim_instansi: data.pengirim_instansi || "",
@@ -275,13 +308,20 @@ export default function RegistrationEdit() {
           asal_sampel: data.asal_sampel || "Mandiri",
         });
 
-        // 3. Transform Details ke Selected Items
+        // Ekstrak baseSequence dari string nomor sampel yang sudah tersimpan
+        if (data.no_sampel_lab) {
+          const firstSample = data.no_sampel_lab.split(",")[0].trim();
+          const parts = firstSample.split(" ");
+          if (parts.length >= 3) {
+            setBaseSequence(parts[parts.length - 3]);
+          }
+        }
+
+        // Transform Details ke Selected Items
         if (data.details && Array.isArray(data.details)) {
           const grouped = {};
-
           data.details.forEach((detail) => {
             const pid = detail.pemeriksaan_id;
-
             if (!grouped[pid]) {
               const masterItem = masterList.find((m) => m.id === pid);
               grouped[pid] = {
@@ -291,16 +331,16 @@ export default function RegistrationEdit() {
                   ? masterItem.nama_pemeriksaan
                   : detail.nama_pemeriksaan,
                 harga: Number(detail.harga_saat_ini),
+                kode_sampel: masterItem ? masterItem.kode_sampel : "",
               };
             }
             grouped[pid].qty += 1;
           });
-
           setSelectedItems(Object.values(grouped));
         } else if (data.pemeriksaan_ids) {
           const items = data.pemeriksaan_ids
-            .map((id) => {
-              const master = masterList.find((m) => m.id === Number(id));
+            .map((itemId) => {
+              const master = masterList.find((m) => m.id === Number(itemId));
               return master ? { ...master, qty: 1 } : null;
             })
             .filter(Boolean);
@@ -324,11 +364,81 @@ export default function RegistrationEdit() {
     } else {
       const total = selectedItems.reduce(
         (sum, item) => sum + Number(item.harga) * item.qty,
-        0
+        0,
       );
       setTotalBiaya(total);
     }
   }, [selectedItems, form.status_pembayaran]);
+
+  // --- LOGIC PENOMORAN OTOMATIS BERDASARKAN BASE SEQUENCE ---
+  const requiredInstallations = useMemo(() => {
+    const codes = selectedItems
+      .map((item) => item.kode_sampel || "UMUM")
+      .filter(Boolean);
+    const uniqueCodes = [...new Set(codes)];
+    return uniqueCodes.sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+    );
+  }, [selectedItems]);
+
+  useEffect(() => {
+    const bulan = new Date().getMonth() + 1;
+    const tahun = new Date().getFullYear();
+
+    if (requiredInstallations.length > 0 && baseSequence !== "") {
+      const startNum = parseInt(baseSequence, 10) || 1;
+      const parts = requiredInstallations.map((kode) => {
+        return `${kode} ${startNum} ${bulan} ${tahun}`;
+      });
+
+      setForm((prev) => ({ ...prev, no_sampel_lab: parts.join(", ") }));
+    } else {
+      setForm((prev) => ({ ...prev, no_sampel_lab: "" }));
+    }
+  }, [baseSequence, requiredInstallations]);
+
+  // --- CEK KETERSEDIAAN NOMOR SAMPEL (EXCLUDE CURRENT ID) ---
+  useEffect(() => {
+    const checkSampleId = async () => {
+      const sampleId = form.no_sampel_lab?.trim();
+      if (!sampleId) {
+        setIsSampleIdAvailable(true);
+        setSampleIdMessage("");
+        return;
+      }
+
+      setCheckingSampleId(true);
+      try {
+        const safeId = encodeURIComponent(sampleId);
+        // Penting: Kirim excludeId agar tidak bentrok dengan datanya sendiri!
+        const res = await api.get(
+          `/registrations/check-sample-no/${safeId}?excludeId=${id}`,
+        );
+
+        if (res.data.available) {
+          setIsSampleIdAvailable(true);
+          setSampleIdMessage("Semua nomor sampel tersedia ✅");
+        } else {
+          setIsSampleIdAvailable(false);
+          setSampleIdMessage(
+            "Terdapat nomor sampel yang bentrok/sudah digunakan ❌",
+          );
+        }
+      } catch (error) {
+        console.error("Gagal cek nomor sampel", error);
+      } finally {
+        setCheckingSampleId(false);
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      if (form.no_sampel_lab) {
+        checkSampleId();
+      }
+    }, 800);
+
+    return () => clearTimeout(timeoutId);
+  }, [form.no_sampel_lab, id]);
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -343,7 +453,7 @@ export default function RegistrationEdit() {
     }));
   };
 
-  // Auto Age
+  // Auto Calculate Age
   useEffect(() => {
     if (form.tgl_lahir) {
       const today = new Date();
@@ -359,11 +469,28 @@ export default function RegistrationEdit() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!isSampleIdAvailable) {
+      toast.error(
+        "Nomor Sampel Lab sudah digunakan pasien lain! Ganti nomor urut start.",
+      );
+      return;
+    }
+
+    if (checkingSampleId) {
+      toast.info("Sedang memverifikasi nomor sampel...");
+      return;
+    }
+
+    if (selectedItems.length === 0) {
+      toast.warning("Mohon pilih minimal satu jenis pemeriksaan");
+      return;
+    }
+
     setSaving(true);
 
     const {
       no_reg,
-      no_sampel_lab,
       id: _,
       created_at,
       updated_at,
@@ -395,14 +522,64 @@ export default function RegistrationEdit() {
     }
   };
 
+  // --- HELPER UNTUK HIGHLIGHT NOMOR TERAKHIR ---
+  const renderHighlightedSequence = (str) => {
+    if (
+      !str ||
+      str === "Belum ada data registrasi" ||
+      str === "Error memuat data terakhir"
+    ) {
+      return str;
+    }
+
+    const samples = str.split(",").map((s) => s.trim());
+
+    return samples.map((sample, sIndex) => {
+      const parts = sample.split(" ");
+      if (parts.length >= 3) {
+        const seqIndex = parts.length - 3;
+        return (
+          <span key={sIndex}>
+            {sIndex > 0 && ", "}
+            {parts.map((part, pIndex) => (
+              <span key={pIndex}>
+                {pIndex === seqIndex ? (
+                  <span className="text-black font-black mx-0.5">{part}</span>
+                ) : (
+                  <span className="text-yellow-900">{part}</span>
+                )}
+                {pIndex < parts.length - 1 && " "}
+              </span>
+            ))}
+          </span>
+        );
+      }
+
+      return (
+        <span key={sIndex}>
+          {sIndex > 0 && ", "}
+          {sample}
+        </span>
+      );
+    });
+  };
+
   const formatRupiah = (num) =>
     new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
     }).format(num);
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="animate-spin text-cyan-600" size={40} />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 font-sans pb-20">
+    <div className="min-h-screen bg-gray-50 font-sans pb-20 animate-fade-in">
       <div className="max-w-6xl mx-auto py-10 px-6">
         <div className="flex items-center justify-between mb-8">
           <button
@@ -425,6 +602,7 @@ export default function RegistrationEdit() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
+          {/* HEADER (Synced with form design) */}
           <div className="bg-cyan-50 border-b border-cyan-100 p-6 flex flex-col md:flex-row gap-6 justify-between items-center">
             <div className="flex gap-8">
               <div>
@@ -435,14 +613,30 @@ export default function RegistrationEdit() {
                   {form.no_reg}
                 </p>
               </div>
-              <div>
-                <p className="text-xs font-bold text-cyan-700 uppercase">
-                  Sampel Lab
-                </p>
-                <p className="text-lg font-mono font-bold text-gray-800">
-                  {form.no_sampel_lab}
-                </p>
-              </div>
+            </div>
+
+            <div className="flex flex-row items-end gap-3 p-2">
+              <FormSelect
+                label="Asal Sampel"
+                name="asal_sampel"
+                value={form.asal_sampel}
+                onChange={handleAsalSampelChange}
+              >
+                <option value="Mandiri">Mandiri (Umum)</option>
+                <option value="Rujukan">Rujukan (Faskes/RS)</option>
+              </FormSelect>
+
+              {form.asal_sampel === "Rujukan" && (
+                <FormSelect
+                  label="Status Pembayaran"
+                  name="status_pembayaran"
+                  value={form.status_pembayaran}
+                  onChange={handleChange}
+                >
+                  <option value="berbayar">Berbayar</option>
+                  <option value="gratis">Tidak Berbayar / Program</option>
+                </FormSelect>
+              )}
             </div>
           </div>
 
@@ -520,37 +714,9 @@ export default function RegistrationEdit() {
 
                 <div>
                   <h3 className="font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100">
-                    Info Sampel & Admin
+                    Info Tambahan & Admin
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormSelect
-                      label="Asal Sampel"
-                      name="asal_sampel"
-                      value={form.asal_sampel}
-                      onChange={handleAsalSampelChange}
-                    >
-                      <option value="Mandiri">Mandiri (Umum)</option>
-                      <option value="Rujukan">Rujukan (Faskes/RS)</option>
-                    </FormSelect>
-
-                    {form.asal_sampel === "Rujukan" ? (
-                      <FormSelect
-                        label="Status Pembayaran"
-                        name="status_pembayaran"
-                        value={form.status_pembayaran}
-                        onChange={handleChange}
-                      >
-                        <option value="berbayar">Berbayar</option>
-                        <option value="gratis">Tidak Berbayar / Program</option>
-                      </FormSelect>
-                    ) : (
-                      <FormInput
-                        label="Status Pembayaran"
-                        value="BERBAYAR (MANDIRI)"
-                        disabled
-                      />
-                    )}
-
                     <FormInput
                       label="Pengirim / Instansi"
                       name="pengirim_instansi"
@@ -559,7 +725,6 @@ export default function RegistrationEdit() {
                       placeholder="Nama Dokter / RS / Klinik"
                       icon={Building2}
                     />
-
                     <FormInput
                       label="Tgl Daftar"
                       type="date"
@@ -576,32 +741,119 @@ export default function RegistrationEdit() {
                       onChange={handleChange}
                       icon={Clock}
                     />
-                  </div>
-
-                  <div className="mt-4">
-                    <FormInput
-                      label="Catatan Tambahan"
-                      name="catatan_tambahan"
-                      value={form.catatan_tambahan}
-                      onChange={handleChange}
-                      icon={FileText}
-                    />
+                    <div className="md:col-span-2">
+                      <FormInput
+                        label="Catatan Tambahan"
+                        name="catatan_tambahan"
+                        value={form.catatan_tambahan}
+                        onChange={handleChange}
+                        icon={FileText}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* <div className="lg:col-span-1 h-full flex flex-col">
-                <h3 className="font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100">
-                  Item Pemeriksaan
-                </h3>
-                <ExaminationSelector
-                  masterData={masterPemeriksaan}
-                  selectedItems={selectedItems}
-                  onChange={setSelectedItems}
-                />
-              </div> */}
+              {/* PANEL PEMERIKSAAN & KONFIGURASI NOMOR SAMPEL */}
+              <div className="lg:col-span-2 h-full flex flex-col lg:flex-row gap-6">
+                <div className="flex-1">
+                  <h3 className="font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100">
+                    Item Pemeriksaan
+                  </h3>
+                  <ExaminationSelector
+                    masterData={masterPemeriksaan}
+                    selectedItems={selectedItems}
+                    onChange={setSelectedItems}
+                  />
+                </div>
+
+                {/* --- PANEL KONFIGURASI NOMOR SAMPEL (Synced with form) --- */}
+                <div className="w-full lg:w-1/3 flex flex-col gap-4">
+                  <div className="space-y-3 bg-white p-4 border border-gray-200 rounded-xl shadow-sm">
+                    <label className="text-sm font-bold text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-2">
+                      <Settings2 size={16} className="text-cyan-600" />
+                      Konfigurasi Nomor Sampel
+                    </label>
+
+                    {/* INFO NOMOR TERAKHIR DATABASE */}
+                    <div className="bg-yellow-50/80 border border-yellow-200 rounded-lg p-2.5 mb-2 shadow-sm">
+                      <p className="text-[10px] text-yellow-700 font-bold uppercase mb-0.5">
+                        Riwayat Nomor Terakhir Database:
+                      </p>
+                      <p className="text-xs font-mono font-medium wrap-break-word leading-tight items-center flex flex-wrap">
+                        {renderHighlightedSequence(lastSampleString)}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-gray-600">
+                        Edit Nomor Urut (Base Sequence)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none text-sm font-bold"
+                        value={baseSequence}
+                        onChange={(e) =>
+                          setBaseSequence(e.target.value.replace(/\D/g, ""))
+                        }
+                        placeholder="Angka urut..."
+                      />
+                    </div>
+
+                    {requiredInstallations.length === 0 ? (
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-500 text-center italic">
+                        Pilih item untuk preview nomor
+                      </div>
+                    ) : (
+                      <div className="space-y-2 mt-2">
+                        <p className="text-[11px] font-medium text-gray-500">
+                          Preview {requiredInstallations.length} Tabung/Sampel
+                          Fisik:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {requiredInstallations.map((kode) => {
+                            const startNum = parseInt(baseSequence, 10) || 1;
+                            return (
+                              <div
+                                key={kode}
+                                className="bg-cyan-50 border border-cyan-200 text-cyan-800 px-3 py-1.5 rounded-md text-xs font-bold font-mono shadow-sm"
+                              >
+                                {kode}{" "}
+                                <span className="text-cyan-600">
+                                  {startNum}
+                                </span>{" "}
+                                {new Date().getMonth() + 1}{" "}
+                                {new Date().getFullYear()}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Validation Message */}
+                    {form.no_sampel_lab && (
+                      <div className="flex flex-col mt-2 pt-2 border-t border-gray-100">
+                        <span
+                          className={`text-xs font-medium flex items-center gap-1 ${
+                            isSampleIdAvailable
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {checkingSampleId
+                            ? "Memeriksa ketersediaan DB..."
+                            : sampleIdMessage}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
+            {/* BOTTOM BAR ACTION */}
             <div className="mt-auto bg-gray-50 border-t border-gray-200 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="flex items-start gap-4 flex-1">
                 <div className="bg-cyan-100 p-3 rounded-xl text-cyan-700 shrink-0">
@@ -628,7 +880,7 @@ export default function RegistrationEdit() {
 
                   {selectedItems.length > 0 && (
                     <div className="mt-2 text-xs text-gray-600 max-h-20 overflow-y-auto custom-scrollbar border-l-2 border-cyan-300 pl-2">
-                      {selectedItems.map((item, idx) => (
+                      {selectedItems.map((item) => (
                         <div
                           key={item.id}
                           className="flex justify-between items-center mb-1"
@@ -656,8 +908,8 @@ export default function RegistrationEdit() {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving}
-                  className="flex-1 md:flex-none px-8 py-3 rounded-xl bg-linear-to-r from-cyan-600 to-blue-600 text-white font-bold hover:shadow-lg hover:shadow-cyan-200 transition flex items-center justify-center gap-2"
+                  disabled={saving || !isSampleIdAvailable}
+                  className="flex-1 md:flex-none px-8 py-3 rounded-xl bg-linear-to-r from-cyan-600 to-blue-600 text-white font-bold hover:shadow-lg hover:shadow-cyan-200 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? (
                     "Menyimpan..."

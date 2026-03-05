@@ -12,6 +12,7 @@ import {
   Save,
   KeyRound,
   Loader2,
+  Building2,
 } from "lucide-react";
 
 export default function UserManagement() {
@@ -19,6 +20,7 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [instalasiList, setInstalasiList] = useState([]);
 
   // State untuk Form
   const [isEditing, setIsEditing] = useState(false);
@@ -29,10 +31,12 @@ export default function UserManagement() {
     fullname: "",
     password: "",
     role: "input",
+    instalasi_id: "",
   });
 
   useEffect(() => {
     fetchUsers();
+    fetchInstalasi();
   }, []);
 
   const fetchUsers = async () => {
@@ -48,9 +52,24 @@ export default function UserManagement() {
     }
   };
 
+  const fetchInstalasi = async () => {
+    try {
+      const res = await api.get("/master/instalasi");
+      if (res.data.success) setInstalasiList(res.data.data);
+    } catch (error) {
+      console.error("Gagal load instalasi", error);
+    }
+  };
+
   const handleAddNew = () => {
     setIsEditing(false);
-    setFormData({ id: null, username: "", password: "", role: "input" });
+    setFormData({
+      id: null,
+      username: "",
+      password: "",
+      role: "input",
+      instalasi_id: "",
+    });
     setShowModal(true);
   };
 
@@ -62,6 +81,7 @@ export default function UserManagement() {
       fullname: user.fullname || "",
       password: "",
       role: user.role,
+      instalasi_id: user.instalasi_id || "",
     });
     setShowModal(true);
   };
@@ -84,10 +104,13 @@ export default function UserManagement() {
 
     try {
       if (isEditing) {
+        // FIX: Tambahkan instalasi_id ke dalam payload update.
+        // Jika bukan lab, paksa menjadi null agar bersih.
         const payload = {
           username: formData.username,
           fullname: formData.fullname,
           role: formData.role,
+          instalasi_id: formData.role === "lab" ? formData.instalasi_id : null,
         };
         if (formData.password) payload.password = formData.password;
 
@@ -99,7 +122,11 @@ export default function UserManagement() {
           setSubmitLoading(false);
           return;
         }
-        await api.post("/users/register", formData);
+
+        const submitData = { ...formData };
+        if (submitData.role !== "lab") submitData.instalasi_id = null;
+
+        await api.post("/users/register", submitData);
         toast.success("User baru berhasil dibuat");
       }
 
@@ -114,7 +141,7 @@ export default function UserManagement() {
   };
 
   const filteredUsers = users.filter((u) =>
-    u.username.toLowerCase().includes(searchTerm.toLowerCase())
+    u.username.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const RoleBadge = ({ role }) => {
@@ -332,7 +359,29 @@ export default function UserManagement() {
                 </select>
               </div>
               {/* ------------------------------------------------------------------- */}
-
+              {formData.role === "lab" && (
+                <div className="space-y-1.5 animate-fade-in">
+                  <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Building2 size={16} className="text-cyan-600" /> Penempatan
+                    Instalasi
+                  </label>
+                  <select
+                    required
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-cyan-500 transition-all text-sm"
+                    value={formData.instalasi_id}
+                    onChange={(e) =>
+                      setFormData({ ...formData, instalasi_id: e.target.value })
+                    }
+                  >
+                    <option value="">-- Pilih Instalasi --</option>
+                    {instalasiList.map((inst) => (
+                      <option key={inst.id} value={inst.id}>
+                        {inst.nama_instalasi}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                   <KeyRound size={16} className="text-cyan-600" /> Password
