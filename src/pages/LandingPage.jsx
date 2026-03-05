@@ -210,7 +210,7 @@ export default function LandingPage() {
       {/* --- PROFILE SECTION --- */}
       <section
         id="profil"
-        className="py-24 bg-gradient-to-br from-cyan-600 to-primary text-white relative overflow-hidden"
+        className="py-24 bg-linear-to-br from-cyan-600 to-primary text-white relative overflow-hidden"
       >
         {/* Background Pattern - Diperhalus agar tidak mengganggu keterbacaan */}
         <div
@@ -359,7 +359,7 @@ export default function LandingPage() {
           </div>
 
           <div className="border-t border-gray-100 pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
-            <p>&copy; 2025 All rights reserved by LIMS Labkesmas Banda Aceh.</p>
+            <p>&copy; 2026 All rights reserved by LIMS Labkesmas Banda Aceh.</p>
             <div className="flex gap-6 mt-4 md:mt-0">
               <a href="#" className="hover:text-cyan-600">
                 Privacy Policy

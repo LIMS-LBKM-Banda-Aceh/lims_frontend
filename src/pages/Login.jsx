@@ -104,12 +104,12 @@ export default function Login() {
                 <label className="text-sm font-semibold text-gray-700">
                   Password
                 </label>
-                <a
+                {/* <a
                   href="#"
                   className="text-xs font-medium text-cyan-600 hover:text-cyan-700 hover:underline"
                 >
                   Lupa Password?
-                </a>
+                </a> */}
               </div>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -158,7 +158,7 @@ export default function Login() {
           {/* Footer Copyright */}
           <div className="mt-8 pt-6 border-t border-gray-100 text-center">
             <p className="text-xs text-gray-400">
-              &copy; 2025 LIMS BLKM Banda Aceh. <br /> All rights reserved.
+              &copy; 2026 LIMS BLKM Banda Aceh. <br /> All rights reserved.
             </p>
           </div>
         </div>

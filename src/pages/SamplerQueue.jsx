@@ -50,7 +50,9 @@ export default function SamplerQueue({ onRefreshStats }) {
       if (masterRes.data.success) {
         const map = {};
         masterRes.data.data.forEach((item) => {
-          map[item.nama_pemeriksaan.toLowerCase()] = item.kategori;
+          // MODIFIKASI: Simpan nama_instalasi sebagai value (dengan fallback kategori)
+          map[item.nama_pemeriksaan.toLowerCase()] =
+            item.nama_instalasi || item.kategori || "SAMPEL UMUM";
         });
         setMasterMap(map);
       }
@@ -86,13 +88,15 @@ export default function SamplerQueue({ onRefreshStats }) {
         .replace(/\s*\(\d+\)$/, "")
         .toLowerCase(),
     );
-    const detectedCategories = new Set();
+    const detectedInstalasi = new Set();
+
     examNames.forEach((name) => {
-      const cat = masterMap[name];
-      if (cat) detectedCategories.add(cat.toUpperCase());
+      // MODIFIKASI: Membaca dari masterMap yang sekarang berisi nama_instalasi
+      const inst = masterMap[name];
+      if (inst) detectedInstalasi.add(inst.toUpperCase());
     });
 
-    if (detectedCategories.size === 0) {
+    if (detectedInstalasi.size === 0) {
       return (
         <span className="bg-gray-100 text-gray-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-gray-200 flex items-center gap-1 w-fit">
           <FlaskConical size={10} /> SAMPEL UMUM
@@ -102,93 +106,98 @@ export default function SamplerQueue({ onRefreshStats }) {
 
     return (
       <div className="flex flex-wrap gap-1">
-        {Array.from(detectedCategories).map((cat) => {
+        {Array.from(detectedInstalasi).map((inst) => {
+          // Tetap gunakan keyword untuk menentukan warna badge
           if (
-            ["HEMATOLOGI", "KIMIA KLINIK", "IMUNOLOGI", "SEROLOGI"].some((c) =>
-              cat.includes(c),
-            )
+            [
+              "HEMATOLOGI",
+              "KIMIA KLINIK",
+              "IMUNOLOGI",
+              "SEROLOGI",
+              "KLINIK",
+            ].some((c) => inst.includes(c))
           ) {
             return (
               <span
-                key={cat}
+                key={inst}
                 className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-red-200 flex items-center gap-1"
               >
-                <Droplets size={10} /> {cat}
+                <Droplets size={10} /> {inst}
               </span>
             );
           }
-          if (cat.includes("URIN")) {
+          if (inst.includes("URIN")) {
             return (
               <span
-                key={cat}
+                key={inst}
                 className="bg-yellow-100 text-yellow-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-yellow-200 flex items-center gap-1"
               >
-                <FlaskConical size={10} /> {cat}
+                <FlaskConical size={10} /> {inst}
               </span>
             );
           }
           if (
             ["VEKTOR", "PARASITOLOGI", "ENTOMOLOGI"].some((c) =>
-              cat.includes(c),
+              inst.includes(c),
             )
           ) {
             return (
               <span
-                key={cat}
+                key={inst}
                 className="bg-orange-100 text-orange-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-orange-200 flex items-center gap-1"
               >
-                <Bug size={10} /> {cat}
+                <Bug size={15} /> {inst}
               </span>
             );
           }
           if (
             ["LINGKUNGAN", "AIR", "FISIKA", "LIMBAH"].some((c) =>
-              cat.includes(c),
+              inst.includes(c),
             )
           ) {
             return (
               <span
-                key={cat}
+                key={inst}
                 className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-blue-200 flex items-center gap-1"
               >
-                <Droplets size={10} /> {cat}
+                <Droplets size={10} /> {inst}
               </span>
             );
           }
           if (
             ["MAKANAN", "MINUMAN", "TOKSIKOLOGI", "KIMIA MAKANAN"].some((c) =>
-              cat.includes(c),
+              inst.includes(c),
             )
           ) {
             return (
               <span
-                key={cat}
+                key={inst}
                 className="bg-emerald-100 text-emerald-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-emerald-200 flex items-center gap-1"
               >
-                <Beef size={10} /> {cat}
+                <Beef size={10} /> {inst}
               </span>
             );
           }
           if (
             ["BIOMOLEKULER", "PCR", "MIKROBIOLOGI", "BAKTERIOLOGI"].some((c) =>
-              cat.includes(c),
+              inst.includes(c),
             )
           ) {
             return (
               <span
-                key={cat}
+                key={inst}
                 className="bg-purple-100 text-purple-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-purple-200 flex items-center gap-1"
               >
-                <Microscope size={10} /> {cat}
+                <Microscope size={10} /> {inst}
               </span>
             );
           }
           return (
             <span
-              key={cat}
+              key={inst}
               className="bg-gray-100 text-gray-600 text-[10px] px-2 py-0.5 rounded-md font-bold border border-gray-200 flex items-center gap-1"
             >
-              <FlaskConical size={10} /> {cat}
+              <FlaskConical size={10} /> {inst}
             </span>
           );
         })}
@@ -422,110 +431,167 @@ export default function SamplerQueue({ onRefreshStats }) {
                 paginatedData.map((item) => (
                   <tr
                     key={item.id}
-                    className="hover:bg-gray-50/50 transition-colors group"
+                    className="hover:bg-slate-50 transition-colors group border-b border-gray-100 last:border-none"
                   >
-                    {/* Kolom 1: Identitas */}
+                    {/* KOLOM 1: Identitas Pasien */}
                     <td className="px-6 py-5 align-top">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-linear-to-br from-gray-100 to-gray-200 flex flex-col items-center justify-center text-gray-500 border border-gray-200 group-hover:from-cyan-50 group-hover:to-blue-50 group-hover:border-cyan-100 transition-all shrink-0">
-                          <User size={20} />
-                          <span className="text-[9px] font-bold uppercase">
-                            {item.jenis_kelamin}
-                          </span>
+                      <div className="flex items-start gap-4">
+                        {/* Avatar */}
+                        <div className="w-11 h-11 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-400 shadow-sm group-hover:bg-blue-50 group-hover:text-blue-600 group-hover:border-blue-200 transition-all duration-300 shrink-0 mt-0.5">
+                          <User size={20} strokeWidth={2} />
                         </div>
-                        <div>
-                          <div className="font-bold text-gray-900 text-base leading-tight">
-                            {item.nama_pasien}
+
+                        {/* Informasi Pasien */}
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-gray-900 text-sm">
+                              {item.nama_pasien}
+                            </span>
+                            <span className="text-gray-300 text-[10px]">●</span>
+                            <span className="text-gray-500 text-xs font-medium">
+                              {item.umur} Thn
+                            </span>
+                            <span className="text-gray-300 text-[10px]">●</span>
+                            <span className="text-gray-500 text-xs font-medium uppercase">
+                              {item.jenis_kelamin === "L"
+                                ? "Laki-laki"
+                                : item.jenis_kelamin === "P"
+                                  ? "Perempuan"
+                                  : item.jenis_kelamin}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="font-mono text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-bold border border-gray-200">
-                              {item.no_reg}
-                            </span>
-                            <span className="text-xs text-gray-400 font-medium text-center">
-                              {item.umur} Tahun
-                            </span>
+
+                          {/* Data Teknis (Badge System) */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-md">
+                              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                                Reg
+                              </span>
+                              <span className="font-mono text-xs font-medium text-gray-700">
+                                {item.no_reg}
+                              </span>
+                            </div>
+                            {item.no_sampel_lab &&
+                              item.no_sampel_lab !== "-" && (
+                                <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md">
+                                  <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">
+                                    Lab
+                                  </span>
+                                  <span className="font-mono text-xs font-medium text-blue-700">
+                                    {item.no_sampel_lab}
+                                  </span>
+                                </div>
+                              )}
                           </div>
                         </div>
                       </div>
                     </td>
 
-                    {/* Kolom 2: Pemeriksaan & Badges */}
+                    {/* KOLOM 2: Pemeriksaan & Catatan */}
                     <td className="px-6 py-5 align-top">
-                      <div className="space-y-2">
-                        {renderSampleBadges(item.jenis_pemeriksaan)}
-                        <p
-                          className="text-xs text-gray-600 font-medium line-clamp-2 italic"
-                          title={item.jenis_pemeriksaan}
-                        >
-                          {item.jenis_pemeriksaan}
-                        </p>
+                      <div className="flex flex-col gap-2.5 max-w-sm">
+                        <div className="space-y-1.5">
+                          {/* Container untuk Badge Pemeriksaan */}
+                          <div className="flex flex-wrap gap-1.5">
+                            {renderSampleBadges(item.jenis_pemeriksaan)}
+                          </div>
+                          <p
+                            className="text-xs text-gray-500 font-medium leading-relaxed line-clamp-2"
+                            title={item.jenis_pemeriksaan}
+                          >
+                            {item.jenis_pemeriksaan}
+                          </p>
+                        </div>
+
+                        {/* Catatan Tambahan (UI Diperhalus) */}
                         {item.catatan_tambahan && (
-                          <div className="flex items-start gap-1 text-[11px] text-orange-600 bg-orange-50 p-1.5 rounded-lg border border-orange-100">
+                          <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50/80 p-2.5 rounded-lg border border-amber-200/50">
                             <ClipboardList
-                              size={12}
-                              className="mt-0.5 shrink-0"
+                              size={14}
+                              className="mt-0.5 shrink-0 text-amber-500"
                             />
-                            <span>Catatan: {item.catatan_tambahan}</span>
+                            <span className="leading-relaxed font-medium">
+                              {item.catatan_tambahan}
+                            </span>
                           </div>
                         )}
                       </div>
                     </td>
 
-                    {/* Kolom 3: Waktu */}
+                    {/* KOLOM 3: Waktu & Status */}
                     <td className="px-6 py-5 align-top">
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          <Clock size={14} className="text-gray-400" />
-                          <span>
-                            Terdaftar:{" "}
-                            {new Date(item.created_at).toLocaleTimeString(
-                              "id-ID",
-                              { hour: "2-digit", minute: "2-digit" },
-                            )}{" "}
-                            WIB
-                          </span>
+                      <div className="flex flex-col gap-3">
+                        {/* Waktu Terdaftar */}
+                        <div className="flex items-start gap-2">
+                          <Clock
+                            size={16}
+                            className="text-gray-400 mt-0.5 shrink-0"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                              Waktu Daftar
+                            </span>
+                            <span className="text-sm font-semibold text-gray-700">
+                              {new Date(item.created_at).toLocaleTimeString(
+                                "id-ID",
+                                {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}{" "}
+                              <span className="text-xs font-normal text-gray-500">
+                                WIB
+                              </span>
+                            </span>
+                          </div>
                         </div>
+
+                        {/* Status Animasi */}
                         {item.status === "proses_sampling" && (
-                          <div className="flex items-center gap-2 text-[10px] font-semibold text-orange-600 bg-orange-50 w-fit px-2 py-1 rounded-md animate-pulse">
-                            <Syringe size={14} />
-                            <span>Sedang Diambil...</span>
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 w-fit px-2.5 py-1.5 rounded-md">
+                            <Syringe
+                              size={14}
+                              className="animate-pulse text-blue-500"
+                            />
+                            <span className="animate-pulse">
+                              Sedang Diambil
+                            </span>
                           </div>
                         )}
                       </div>
                     </td>
 
-                    {/* Kolom 4: Aksi */}
+                    {/* KOLOM 4: Aksi */}
                     <td className="px-6 py-5 align-top">
-                      <div className="flex justify-center">
+                      <div className="flex justify-end min-w-[140px]">
                         {item.status === "terdaftar" ? (
                           <button
                             onClick={() =>
                               handleStartSampling(item.id, item.no_reg)
                             }
-                            className="group/btn relative overflow-hidden bg-cyan-600 text-white pl-4 pr-10 py-2.5 rounded-xl text-xs font-bold hover:bg-cyan-700 transition-all shadow-md shadow-cyan-100 active:scale-95 flex items-center gap-2"
+                            className="group/btn relative overflow-hidden bg-cyan-600 text-white pl-4 pr-11 py-2.5 rounded-xl text-xs font-bold hover:bg-cyan-700 transition-all shadow-sm hover:shadow-cyan-200 active:scale-95 flex items-center justify-between w-full"
                           >
-                            Proses Sampling
-                            <div className="absolute right-0 top-0 bottom-0 w-8 bg-cyan-500 flex items-center justify-center group-hover/btn:w-10 transition-all">
-                              <PlayCircle size={18} />
+                            <span>Proses Sampling</span>
+                            <div className="absolute right-0 top-0 bottom-0 w-9 bg-cyan-700/50 flex items-center justify-center group-hover/btn:w-10 transition-all">
+                              <PlayCircle size={16} />
                             </div>
                           </button>
                         ) : (
-                          <div className="flex flex-col items-center gap-2">
+                          <div className="flex flex-col gap-2 w-full">
                             <button
                               onClick={() =>
                                 handleSendToLab(item.id, item.no_reg)
                               }
-                              className="bg-green-600 text-white px-2 py-2 rounded-xl text-xs font-bold hover:bg-green-700 transition-all shadow-md shadow-green-100 active:scale-95 flex items-center gap-2"
+                              className="bg-green-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-green-700 transition-all shadow-sm hover:shadow-green-200 active:scale-95 flex items-center justify-center gap-2 w-full"
                             >
-                              <Send size={16} /> Teruskan Ke Lab
+                              <Send size={14} /> Teruskan Ke Lab
                             </button>
-                            <span className="text-[10px] text-gray-400 flex items-center gap-1 font-bold">
-                              <AlertCircle
-                                size={12}
-                                className="text-orange-400"
-                              />{" "}
-                              Periksa Label
-                            </span>
+
+                            {/* Peringatan Label (Menjadi bagian dari grup aksi) */}
+                            <div className="flex items-center justify-center gap-1.5 text-[10px] font-bold text-amber-600 bg-amber-50 py-1.5 rounded-lg border border-amber-100">
+                              <AlertCircle size={12} />
+                              <span>Periksa Label</span>
+                            </div>
                           </div>
                         )}
                       </div>

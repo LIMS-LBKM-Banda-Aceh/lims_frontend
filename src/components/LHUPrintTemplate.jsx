@@ -91,7 +91,7 @@ export default function LHUPrintTemplate({ data }) {
               <td>: {formatDate(data.tgl_daftar)}</td>
             </tr>
             <tr>
-              <td className="py-1">Kode/ID Lab</td>
+              <td className="py-1">Kode Spesimen/Sampel</td>
               <td>: {data.no_sampel_lab}</td>
             </tr>
             <tr>

@@ -26,6 +26,7 @@ import LabQueue from "./LabQueue";
 import DataManagement from "./DataManagement";
 import ValidationQueue from "./ValidationQueue";
 import SamplerQueue from "./SamplerQueue";
+import FinanceDashboard from "./FinanceDashboard";
 
 const StatCard = ({ title, value, icon: Icon, color, subtext }) => (
   <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between hover:shadow-md transition-shadow">
@@ -264,7 +265,7 @@ export default function Dashboard() {
                   stats={stats}
                   onChangeView={handleChangeView}
                   onRefresh={fetchMainData}
-                  userRole={user?.role} 
+                  userRole={user?.role}
                 />
               )}
               {view === "create" && (
@@ -297,6 +298,7 @@ export default function Dashboard() {
                   />
                 </div>
               )}
+              {view === "finance" && <FinanceDashboard />}
               {view === "detail" && (
                 <RegistrationDetail
                   data={selectedRegistration}

@@ -1,5 +1,3 @@
-// pages/RegistrationDetail.jsx
-
 import React, { useState, useEffect } from "react";
 import api from "../api/axios";
 import { toast } from "react-toastify";
@@ -14,23 +12,70 @@ import {
   Activity,
   CreditCard,
   Save,
-  Edit2,
   FlaskConical,
+  AlertCircle,
+  Settings2,
+  X,
+  Loader2,
 } from "lucide-react";
 
 export default function RegistrationDetail({ data, onBack }) {
-  const [isEditingNo, setIsEditingNo] = useState(false);
-  const [invoiceNo, setInvoiceNo] = useState("");
-  const [loadingSave, setLoadingSave] = useState(false);
   const { user: currentUser } = useAuth();
 
-  // Set default template jika no_invoice masih kosong
+  // --- STATE INVOICE UX (BEST PRACTICE) ---
+  const [isEditingNo, setIsEditingNo] = useState(false);
+  const [invoiceNo, setInvoiceNo] = useState("");
+  const [invoiceBaseSeq, setInvoiceBaseSeq] = useState("");
+  const [lastInvoice, setLastInvoice] = useState("");
+  const [isInvoiceSaved, setIsInvoiceSaved] = useState(false);
+  const [loadingSave, setLoadingSave] = useState(false);
+
+  // Fetch riwayat invoice terakhir khusus untuk Kasir / Admin
+  useEffect(() => {
+    const fetchLastInvoice = async () => {
+      try {
+        const res = await api.get("/registrations/last-invoice");
+        if (res.data.success && res.data.data) {
+          setLastInvoice(res.data.data);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil history invoice", error);
+      }
+    };
+
+    if (["admin", "kasir"].includes(currentUser?.role?.toLowerCase())) {
+      fetchLastInvoice();
+    }
+  }, [currentUser]);
+
+  // Set default template, preview auto-increment, & status save
   useEffect(() => {
     if (data) {
+      setIsInvoiceSaved(!!data.no_invoice);
       const year = new Date().getFullYear();
-      setInvoiceNo(data.no_invoice || ` / 690798 / PNBP / ${year}`);
+
+      if (data.no_invoice) {
+        // Jika data sudah punya invoice, ekstrak urutannya
+        setInvoiceNo(data.no_invoice);
+        const match = data.no_invoice.match(/^(\d+)/);
+        setInvoiceBaseSeq(match ? match[1] : "");
+      } else if (lastInvoice) {
+        // Auto-increment cerdas berdasarkan nomor invoice sebelumnya
+        const match = lastInvoice.match(/^(\d+)/);
+        if (match) {
+          const nextSeq = String(parseInt(match[1], 10) + 1);
+          setInvoiceBaseSeq(nextSeq);
+          setInvoiceNo(`${nextSeq}/690798/PNBP/${year}`);
+        } else {
+          setInvoiceBaseSeq("1"); //
+          setInvoiceNo(`1/690798/PNBP/${year}`); // 
+        }
+      } else {
+        setInvoiceBaseSeq("1"); 
+        setInvoiceNo(`1/690798/PNBP/${year}`); 
+      }
     }
-  }, [data]);
+  }, [data, lastInvoice]);
 
   if (!data) return null;
 
@@ -38,10 +83,10 @@ export default function RegistrationDetail({ data, onBack }) {
     setLoadingSave(true);
     try {
       await api.put(`/registrations/${data.id}`, { no_invoice: invoiceNo });
-      toast.success("Nomor Invoice diperbarui");
+      toast.success("Nomor Invoice sukses diperbarui");
       setIsEditingNo(false);
-      // Update data lokal agar tampilan sinkron
-      data.no_invoice = invoiceNo;
+      setIsInvoiceSaved(true);
+      data.no_invoice = invoiceNo; // Sinkronisasi state lokal
     } catch (error) {
       console.error("Gagal memperbarui nomor:", error);
       toast.error("Gagal menyimpan nomor");
@@ -82,7 +127,6 @@ export default function RegistrationDetail({ data, onBack }) {
     const details = data.details || [];
     const isGratis = data.status_pembayaran === "gratis";
 
-    // 1. Grouping data agar item yang sama muncul dengan Qty
     const groupedDetails = details.reduce((acc, item) => {
       const key = item.nama_pemeriksaan;
       if (!acc[key]) {
@@ -107,7 +151,6 @@ export default function RegistrationDetail({ data, onBack }) {
       );
     }
 
-    // Pisahkan items menjadi dua bagian untuk 2 kolom
     const midIndex = Math.ceil(items.length / 2);
     const leftColumnItems = items.slice(0, midIndex);
     const rightColumnItems = items.slice(midIndex);
@@ -146,7 +189,6 @@ export default function RegistrationDetail({ data, onBack }) {
               </td>
             </tr>
           ))}
-          {/* Fill empty rows if needed to balance heights */}
           {columnItems.length === 0 && (
             <tr>
               <td colSpan="3" className="py-2 text-center text-gray-300">
@@ -169,7 +211,6 @@ export default function RegistrationDetail({ data, onBack }) {
           </div>
         </div>
 
-        {/* Total Section Spanning Full Width */}
         <div className="border-t border-gray-200">
           {isGratis ? (
             <div className="bg-green-50/50 px-4 py-2 flex justify-between items-center border-b border-gray-200">
@@ -183,9 +224,7 @@ export default function RegistrationDetail({ data, onBack }) {
           ) : null}
 
           <div
-            className={`${
-              isGratis ? "bg-secondary" : "bg-primary"
-            } text-white print:bg-gray-100 print:text-black px-2 py-3 flex justify-between items-center`}
+            className={`${isGratis ? "bg-secondary" : "bg-primary"} text-white print:bg-gray-100 print:text-black px-2 py-3 flex justify-between items-center`}
           >
             <span className="font-bold text-xs uppercase tracking-wider">
               {isGratis
@@ -215,56 +254,157 @@ export default function RegistrationDetail({ data, onBack }) {
           Kembali ke List
         </button>
 
-        {/* Proteksi Role: Hanya Admin dan Kasir yang bisa melihat/mengedit nomor invoice & cetak */}
+        {/* Proteksi Role: Hanya Admin dan Kasir */}
         {["admin", "kasir"].includes(currentUser?.role?.toLowerCase()) && (
-          <div className="flex gap-2">
-            {/* INPUT NOMOR INVOICE */}
-            <div className="flex items-center bg-white border border-gray-200 rounded-xl px-3 py-1 shadow-sm">
-              <span className="text-xs font-bold text-gray-400 mr-2 uppercase">
-                No Invoice:
-              </span>
+          <div className="flex flex-col md:flex-row gap-3 items-end md:items-center">
+            {/* PANEL KONFIGURASI INVOICE */}
+            <div
+              className={`flex flex-col bg-white border ${isInvoiceSaved ? "border-gray-200" : "border-red-300 shadow-red-100 bg-red-50/20"} rounded-xl shadow-sm relative transition-all ${isEditingNo ? "p-4 w-full md:w-[380px]" : "px-4 py-2"}`}
+            >
+              {/* Badge Peringatan Jika Belum Disimpan */}
+              {!isInvoiceSaved && !isEditingNo && (
+                <span className="absolute -top-2.5 -right-2 bg-red-500 text-white text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm flex items-center gap-1 animate-pulse">
+                  <AlertCircle size={10} /> WAJIB DISIMPAN
+                </span>
+              )}
+
               {isEditingNo ? (
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    className="border-b border-cyan-500 outline-none text-sm font-bold w-48 px-1"
-                    value={invoiceNo}
-                    onChange={(e) => setInvoiceNo(e.target.value)}
-                    autoFocus
-                  />
-                  <button
-                    onClick={handleSaveInvoice}
-                    disabled={loadingSave}
-                    className="text-green-600 p-1 hover:bg-green-50 rounded"
-                  >
-                    {loadingSave ? "..." : <Save size={16} />}
-                  </button>
+                <div className="flex flex-col gap-3 animate-fade-in">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                    <span className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                      <Settings2 size={16} className="text-cyan-600" />{" "}
+                      Konfigurasi Invoice
+                    </span>
+                    <button
+                      onClick={() => setIsEditingNo(false)}
+                      className="text-gray-400 hover:text-gray-600 p-1 rounded-md transition hover:bg-gray-100"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  {/* INFO NOMOR TERAKHIR DATABASE */}
+                  <div className="bg-yellow-50/80 border border-yellow-200 rounded-lg p-2.5 shadow-sm">
+                    <p className="text-[10px] text-yellow-700 font-bold uppercase mb-0.5">
+                      Riwayat Terakhir Database:
+                    </p>
+                    <p className="text-xs font-mono font-bold text-black">
+                      {lastInvoice || "Belum ada invoice di tahun ini"}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 items-start">
+                    {/* INPUT KHUSUS NOMOR URUT */}
+                    <div className="col-span-1 flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase">
+                        Start Urutan
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="w-full px-2 py-2 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none text-sm font-bold text-center"
+                        value={invoiceBaseSeq}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, "");
+                          setInvoiceBaseSeq(val);
+                          const year = new Date().getFullYear();
+                          setInvoiceNo(
+                            val
+                              ? `${val}/690798/PNBP/${year}`
+                              : `/690798/PNBP/${year}`,
+                          );
+                        }}
+                        placeholder="1"
+                      />
+                    </div>
+
+                    {/* PREVIEW / MANUAL EDIT */}
+                    <div className="col-span-2 flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase">
+                        Preview / Edit Manual
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full px-2 py-2 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none text-sm font-bold font-mono text-cyan-800"
+                        value={invoiceNo}
+                        onChange={(e) => {
+                          setInvoiceNo(e.target.value);
+                          // Coba auto-extract urutan jika diedit manual
+                          const match = e.target.value.match(/^(\d+)/);
+                          setInvoiceBaseSeq(match ? match[1] : "");
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 mt-1">
+                    <button
+                      onClick={() => setIsEditingNo(false)}
+                      className="text-xs px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition font-bold border border-gray-200"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      onClick={handleSaveInvoice}
+                      disabled={loadingSave}
+                      className="text-xs px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition flex items-center gap-1.5 font-bold shadow-sm"
+                    >
+                      {loadingSave ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Save size={14} />
+                      )}{" "}
+                      Simpan Invoice
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-gray-700">
-                    {invoiceNo || "-"}
-                  </span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <span className="text-xs font-bold text-gray-400 mr-2 uppercase">
+                      No Invoice:
+                    </span>
+                    <span
+                      className={`text-sm font-bold font-mono ${isInvoiceSaved ? "text-gray-800" : "text-red-600"}`}
+                    >
+                      {invoiceNo || "-"}
+                    </span>
+                  </div>
                   <button
                     onClick={() => setIsEditingNo(true)}
-                    className="text-cyan-600 p-1 hover:bg-cyan-50 rounded"
+                    className="text-cyan-600 p-1.5 ml-3 hover:bg-cyan-50 rounded-lg transition"
+                    title="Konfigurasi Invoice"
                   >
-                    <Edit2 size={14} />
+                    <Settings2 size={16} />
                   </button>
                 </div>
               )}
             </div>
 
-            {/* TOMBOL PRINT */}
+            {/* TOMBOL PRINT YANG DIPROTEKSI */}
             <button
-              onClick={() => globalThis.print()}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition shadow-lg"
+              onClick={() => {
+                if (!isInvoiceSaved) {
+                  toast.error(
+                    "Akses ditolak! Simpan Nomor Invoice terlebih dahulu sebelum mencetak.",
+                  );
+                  setIsEditingNo(true); // Memaksa kasir membuka mode input konfigurasi
+                  return;
+                }
+                globalThis.print();
+              }}
+              className={`flex items-center justify-center gap-2 px-4 h-[46px] rounded-xl transition shadow-lg shrink-0 ${
+                isInvoiceSaved
+                  ? "bg-gray-800 text-white hover:bg-gray-700 hover:-translate-y-0.5"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed opacity-80"
+              }`}
             >
               <Printer size={18} /> Cetak Bukti
             </button>
           </div>
         )}
       </div>
+
       <div id="print-section" className="print-content-padding">
         {/* --- KOP SURAT (PRINT VIEW) --- */}
         <div className="hidden print:flex justify-between items-center border-b-2 border-black pb-4 mb-6">
@@ -349,7 +489,7 @@ export default function RegistrationDetail({ data, onBack }) {
                   <div className="grid grid-cols-3">
                     <span className="text-gray-500">Umur / JK</span>
                     <span className="col-span-2">
-                      {data.umur} Th /{" "}
+                      {data.umur} Tahun /{" "}
                       {data.jenis_kelamin === "L" ? "Laki-laki" : "Perempuan"}
                     </span>
                   </div>
@@ -416,7 +556,7 @@ export default function RegistrationDetail({ data, onBack }) {
               </div>
             </div>
 
-            {/* Row 2: Rincian Pemeriksaan (Full Width & 2 Columns) */}
+            {/* Row 2: Rincian Pemeriksaan */}
             <div className="mt-8 print:mt-6 border-t border-gray-100 pt-6 print:border-black">
               <div className="flex items-center gap-2 mb-4 print:hidden">
                 <CreditCard size={16} className="text-cyan-600" />
@@ -428,30 +568,12 @@ export default function RegistrationDetail({ data, onBack }) {
             </div>
 
             {/* Footer Tanda Tangan */}
-            {/* <div className="hidden print:flex mt-8 pt-8 justify-end px-8 text-center text-xs text-black break-inside-avoid items-end"> */}
             <div className="hidden print:flex mt-8 pt-8 justify-end text-center text-xs text-black break-inside-avoid items-end">
-
-              {/* <div className="flex flex-col items-center w-56">
-                <p className="mb-20">Pasien / Pengirim</p>
-                <p className="font-bold underline">
-                  {data.nama_pasien || ".........................."}
-                </p>
-              </div>  */}
-             
-
               {/* SISI KANAN: PETUGAS */}
               <div className="flex flex-col items-center justify-center text-center w-64">
-                <p>
-                  Aceh Besar,{" "}
-                  {new Date().toLocaleDateString("id-ID", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </p>
+                <p>Aceh Besar, {formatDate(data.tgl_daftar)}</p>
                 <p>Pengelola PNBP</p>
 
-                {/* Container QR dengan padding yang pas */}
                 <div className="py-2">
                   <QRCode
                     value={qrInvoiceData}
@@ -461,7 +583,6 @@ export default function RegistrationDetail({ data, onBack }) {
                   />
                 </div>
 
-                {/* Tambahan teks kecil agar sama persis dengan style LHU */}
                 <span className="text-[9px] text-gray-400 mb-1">
                   Validasi Digital
                 </span>
