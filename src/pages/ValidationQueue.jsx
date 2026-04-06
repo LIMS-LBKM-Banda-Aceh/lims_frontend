@@ -25,6 +25,7 @@ import {
   ArrowUp,
   ArrowDown,
   AlertCircle,
+  Layers, // <-- Ditambahkan icon Layers untuk grup
 } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -274,6 +275,14 @@ export default function ValidationQueue({ onRefreshStats }) {
     }
   };
 
+  // LOGIKA BARU: Grouping data berdasarkan pemeriksaan_name untuk Modal Validasi
+  const groupedTests = previewData?.tests?.reduce((acc, test) => {
+    const groupName = test.pemeriksaan_name || "Pemeriksaan Lainnya / Tunggal";
+    if (!acc[groupName]) acc[groupName] = [];
+    acc[groupName].push(test);
+    return acc;
+  }, {});
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in p-2 md:p-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -501,7 +510,7 @@ export default function ValidationQueue({ onRefreshStats }) {
       {/* MODAL PREVIEW & ACC */}
       {previewData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-emerald-50">
               <div>
                 <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
@@ -523,7 +532,7 @@ export default function ValidationQueue({ onRefreshStats }) {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 bg-white space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 bg-white space-y-6 custom-scrollbar">
               <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8">
                 <div>
                   <p className="text-[10px] uppercase font-bold text-gray-400 mb-0.5">
@@ -610,7 +619,7 @@ export default function ValidationQueue({ onRefreshStats }) {
                   <table className="w-full text-sm text-left">
                     <thead className="bg-gray-100 text-gray-600 font-bold text-[11px] uppercase tracking-wider">
                       <tr>
-                        <th className="px-5 py-3">Parameter</th>
+                        <th className="px-5 py-3 pl-6">Parameter</th>
                         <th className="px-5 py-3 text-center bg-gray-200/50 w-1/3">
                           Hasil
                         </th>
@@ -619,125 +628,152 @@ export default function ValidationQueue({ onRefreshStats }) {
                         <th className="px-5 py-3">Metode</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {previewData.tests?.map((test, idx) => {
-                        // Implementasi UX Abnormal Disini
-                        const status = analyzeResult(
-                          test.nilai,
-                          test.nilai_rujukan,
-                        );
-                        const isAbnormal = status !== "normal";
 
-                        return (
-                          <tr
-                            key={idx}
-                            className={`hover:bg-gray-50 transition-colors ${isAbnormal ? "bg-red-50/30" : ""}`}
+                    {/* LOOPING BERDASARKAN GRUP PEMERIKSAAN */}
+                    {groupedTests &&
+                      Object.entries(groupedTests).map(
+                        ([groupName, groupItems]) => (
+                          <tbody
+                            key={groupName}
+                            className="divide-y divide-gray-100/70 border-b-4 border-gray-100"
                           >
-                            <td className="px-5 py-3 font-semibold text-gray-700">
-                              {test.parameter_name}
-                            </td>
-
-                            {/* KOLOM HASIL YANG BISA DIEDIT & HIGHLIGHT ABNORMAL */}
-                            <td
-                              className={`px-5 py-3 text-center transition-colors ${
-                                isAbnormal
-                                  ? "bg-red-100/50"
-                                  : "bg-emerald-50/30"
-                              }`}
-                            >
-                              {editingTestId === test.id ? (
-                                <div className="flex items-center gap-2 justify-center">
-                                  <input
-                                    type="text"
-                                    value={editValue}
-                                    onChange={(e) =>
-                                      setEditValue(e.target.value)
-                                    }
-                                    className="w-full max-w-[120px] px-2 py-1 text-sm border border-emerald-400 rounded focus:ring-2 focus:ring-emerald-200 outline-none text-center bg-white"
-                                    autoFocus
+                            {/* BARIS SEPARATOR GRUP */}
+                            <tr className="bg-gray-50/80">
+                              <td
+                                colSpan="5"
+                                className="py-2.5 pl-6 border-l-4 border-emerald-500"
+                              >
+                                <div className="flex items-center gap-2 font-bold text-emerald-800 uppercase tracking-wider text-[11px]">
+                                  <Layers
+                                    size={14}
+                                    className="text-emerald-600"
                                   />
-                                  <button
-                                    onClick={() => handleSaveEdit(test.id)}
-                                    disabled={isSavingEdit}
-                                    className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
-                                  >
-                                    {isSavingEdit ? (
-                                      <Loader2
-                                        size={14}
-                                        className="animate-spin"
-                                      />
-                                    ) : (
-                                      <Save size={14} />
-                                    )}
-                                  </button>
-                                  <button
-                                    onClick={handleCancelEdit}
-                                    disabled={isSavingEdit}
-                                    className="p-1.5 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300"
-                                  >
-                                    <XCircle size={14} />
-                                  </button>
+                                  {groupName}
                                 </div>
-                              ) : (
-                                <div className="flex items-center justify-between group/cell relative">
-                                  <span
-                                    className={`flex-1 flex items-center justify-center gap-1.5 text-base ${
+                              </td>
+                            </tr>
+
+                            {/* BARIS ITEM PARAMETER */}
+                            {groupItems.map((test) => {
+                              const status = analyzeResult(
+                                test.nilai,
+                                test.nilai_rujukan,
+                              );
+                              const isAbnormal = status !== "normal";
+
+                              return (
+                                <tr
+                                  key={test.id}
+                                  className={`hover:bg-gray-50 transition-colors ${isAbnormal ? "bg-red-50/30" : ""}`}
+                                >
+                                  <td className="px-5 py-3 pl-8 font-semibold text-gray-700">
+                                    {test.parameter_name}
+                                  </td>
+
+                                  <td
+                                    className={`px-5 py-3 text-center transition-colors ${
                                       isAbnormal
-                                        ? "text-red-600 font-extrabold"
-                                        : "text-gray-900 font-bold"
+                                        ? "bg-red-100/50"
+                                        : "bg-emerald-50/30"
                                     }`}
                                   >
-                                    {test.nilai}
-                                    {status === "high" && (
-                                      <ArrowUp
-                                        size={16}
-                                        className="text-red-500 stroke-[3px]"
-                                      />
+                                    {editingTestId === test.id ? (
+                                      <div className="flex items-center gap-2 justify-center">
+                                        <input
+                                          type="text"
+                                          value={editValue}
+                                          onChange={(e) =>
+                                            setEditValue(e.target.value)
+                                          }
+                                          className="w-full max-w-[120px] px-2 py-1 text-sm border border-emerald-400 rounded focus:ring-2 focus:ring-emerald-200 outline-none text-center bg-white"
+                                          autoFocus
+                                        />
+                                        <button
+                                          onClick={() =>
+                                            handleSaveEdit(test.id)
+                                          }
+                                          disabled={isSavingEdit}
+                                          className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                                        >
+                                          {isSavingEdit ? (
+                                            <Loader2
+                                              size={14}
+                                              className="animate-spin"
+                                            />
+                                          ) : (
+                                            <Save size={14} />
+                                          )}
+                                        </button>
+                                        <button
+                                          onClick={handleCancelEdit}
+                                          disabled={isSavingEdit}
+                                          className="p-1.5 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300"
+                                        >
+                                          <XCircle size={14} />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center justify-between group/cell relative">
+                                        <span
+                                          className={`flex-1 flex items-center justify-center gap-1.5 text-base ${
+                                            isAbnormal
+                                              ? "text-red-600 font-extrabold"
+                                              : "text-gray-900 font-bold"
+                                          }`}
+                                        >
+                                          {test.nilai}
+                                          {status === "high" && (
+                                            <ArrowUp
+                                              size={16}
+                                              className="text-red-500 stroke-[3px]"
+                                            />
+                                          )}
+                                          {status === "low" && (
+                                            <ArrowDown
+                                              size={16}
+                                              className="text-red-500 stroke-[3px]"
+                                            />
+                                          )}
+                                          {status === "abnormal" && (
+                                            <AlertCircle
+                                              size={16}
+                                              className="text-red-500 stroke-[3px]"
+                                            />
+                                          )}
+                                        </span>
+                                        <button
+                                          onClick={() => handleStartEdit(test)}
+                                          className="opacity-75 md:opacity-0 group-hover/cell:opacity-100 p-1 text-gray-400 hover:text-emerald-600 transition-opacity absolute right-0"
+                                          title="Edit Nilai"
+                                        >
+                                          <Edit2 size={14} />
+                                        </button>
+                                      </div>
                                     )}
-                                    {status === "low" && (
-                                      <ArrowDown
-                                        size={16}
-                                        className="text-red-500 stroke-[3px]"
-                                      />
-                                    )}
-                                    {status === "abnormal" && (
-                                      <AlertCircle
-                                        size={16}
-                                        className="text-red-500 stroke-[3px]"
-                                      />
-                                    )}
-                                  </span>
-                                  <button
-                                    onClick={() => handleStartEdit(test)}
-                                    className="opacity-75 md:opacity-0 group-hover/cell:opacity-100 p-1 text-gray-400 hover:text-emerald-600 transition-opacity absolute right-0"
-                                    title="Edit Nilai"
-                                  >
-                                    <Edit2 size={14} />
-                                  </button>
-                                </div>
-                              )}
-                            </td>
+                                  </td>
 
-                            <td className="px-5 py-3 text-gray-500 text-xs">
-                              {test.satuan}
-                            </td>
-                            <td className="px-5 py-3 text-gray-500 text-xs">
-                              {test.nilai_rujukan}
-                            </td>
-                            <td className="px-5 py-3 text-gray-500 text-xs italic">
-                              {test.metode}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
+                                  <td className="px-5 py-3 text-gray-500 text-xs font-mono">
+                                    {test.satuan}
+                                  </td>
+                                  <td className="px-5 py-3 text-gray-600 text-xs font-medium">
+                                    {test.nilai_rujukan}
+                                  </td>
+                                  <td className="px-5 py-3 text-gray-500 text-[10px] uppercase tracking-wider">
+                                    {test.metode}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        ),
+                      )}
                   </table>
                 </div>
               </div>
             </div>
 
             <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-between items-center">
-              <div className="text-xs text-gray-500 italic flex items-center gap-1">
+              <div className="text-xs text-gray-500 font-medium flex items-center gap-1.5 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
                 <AlertCircle size={14} className="text-red-500" />
                 Hasil <span className="text-red-600 font-bold">merah</span>{" "}
                 menandakan nilai di luar batas normal.

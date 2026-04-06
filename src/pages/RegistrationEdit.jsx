@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import api from "../api/axios";
 import { toast } from "react-toastify";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   Save,
@@ -233,6 +233,7 @@ const ExaminationSelector = ({ selectedItems, onChange, masterData }) => {
 export default function RegistrationEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -241,6 +242,7 @@ export default function RegistrationEdit() {
   const [masterPemeriksaan, setMasterPemeriksaan] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
   const [totalBiaya, setTotalBiaya] = useState(0);
+  const isRestrictedMode = location.state?.restrictItems || false;
 
   // State Nomor Sampel
   const [baseSequence, setBaseSequence] = useState("");
@@ -760,16 +762,55 @@ export default function RegistrationEdit() {
                   <h3 className="font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100">
                     Item Pemeriksaan
                   </h3>
-                  <ExaminationSelector
-                    masterData={masterPemeriksaan}
-                    selectedItems={selectedItems}
-                    onChange={setSelectedItems}
-                  />
+
+                  {isRestrictedMode ? (
+                    /* MODE READ-ONLY (Jika dari Data Management) */
+                    <div className="border border-gray-200 rounded-xl p-5 bg-gray-50/50 h-full">
+                      <div className="mb-4 bg-blue-50 text-blue-700 p-3 rounded-lg text-xs font-medium border border-blue-100 flex items-start gap-2">
+                        <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                        <p>
+                          Anda sedang berada di mode Manajemen Data Akhir.
+                          Penambahan atau pengurangan item uji, serta perubahan
+                          nomor sampel sudah dikunci. Anda hanya bisa mengubah
+                          data identitas pasien.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        {selectedItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex justify-between items-center p-3 bg-white border border-gray-200 rounded-lg shadow-sm"
+                          >
+                            <div>
+                              <p className="text-sm font-bold text-gray-800">
+                                {item.nama_pemeriksaan}
+                              </p>
+                              <p className="text-[10px] text-gray-500">
+                                {formatRupiah(item.harga)}
+                              </p>
+                            </div>
+                            <span className="bg-cyan-100 text-cyan-800 px-2 py-1 rounded text-xs font-bold border border-cyan-200">
+                              Qty: {item.qty}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    /* MODE EDIT FULL (Jika dari Pendaftaran Awal) */
+                    <ExaminationSelector
+                      masterData={masterPemeriksaan}
+                      selectedItems={selectedItems}
+                      onChange={setSelectedItems}
+                    />
+                  )}
                 </div>
 
                 {/* --- PANEL KONFIGURASI NOMOR SAMPEL (Synced with form) --- */}
                 <div className="w-full lg:w-1/3 flex flex-col gap-4">
-                  <div className="space-y-3 bg-white p-4 border border-gray-200 rounded-xl shadow-sm">
+                  <div
+                    className={`space-y-3 bg-white p-4 border border-gray-200 rounded-xl shadow-sm ${isRestrictedMode ? "opacity-70 pointer-events-none" : ""}`}
+                  >
                     <label className="text-sm font-bold text-gray-800 flex items-center gap-2 border-b border-gray-100 pb-2">
                       <Settings2 size={16} className="text-cyan-600" />
                       Konfigurasi Nomor Sampel
@@ -792,7 +833,8 @@ export default function RegistrationEdit() {
                       <input
                         type="text"
                         inputMode="numeric"
-                        className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none text-sm font-bold"
+                        disabled={isRestrictedMode} // Matikan input jika di mode akhir
+                        className={`w-full px-3 py-2 rounded-lg border border-gray-300 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-200 outline-none text-sm font-bold ${isRestrictedMode ? "bg-gray-100 cursor-not-allowed text-gray-500" : ""}`}
                         value={baseSequence}
                         onChange={(e) =>
                           setBaseSequence(e.target.value.replace(/\D/g, ""))
@@ -800,7 +842,6 @@ export default function RegistrationEdit() {
                         placeholder="Angka urut..."
                       />
                     </div>
-
                     {requiredInstallations.length === 0 ? (
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-500 text-center italic">
                         Pilih item untuk preview nomor

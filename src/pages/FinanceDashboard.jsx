@@ -17,6 +17,8 @@ import {
   Calendar,
   Inbox,
 } from "lucide-react";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 import api from "../api/axios";
 
 export default function FinanceDashboard() {
@@ -34,7 +36,7 @@ export default function FinanceDashboard() {
   const fetchFinanceData = async () => {
     try {
       setLoading(true);
-      // Mengirim parameter filter ke Backend (Pastikan backend Anda menerima query ini)
+      // Mengirim parameter filter ke Backend
       const res = await api.get("/registrations/finance/dashboard", {
         params: { period },
       });
@@ -56,50 +58,63 @@ export default function FinanceDashboard() {
     }).format(number || 0);
   };
 
-  const exportToCSV = () => {
-    if (!financeData?.recentData) return;
+  // BEST PRACTICE: Menggunakan SheetJS untuk export langsung ke format .xlsx
+  const exportToExcel = async () => {
+    if (!financeData?.recentData || financeData.recentData.length === 0) return;
 
-    const headers = [
-      "No Registrasi",
-      "Tanggal",
-      "Nama Pasien",
-      "No Invoice",
-      "Status",
-      "Total Biaya (Rp)",
+    // 1. Inisialisasi Workbook dan Worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Laporan Keuangan");
+
+    // 2. Definisikan Kolom dan Lebarnya (Auto-width layout)
+    worksheet.columns = [
+      { header: "No Registrasi", key: "no_reg", width: 20 },
+      { header: "Tanggal", key: "tanggal", width: 15 },
+      { header: "Nama Pasien", key: "nama_pasien", width: 30 },
+      { header: "No Invoice", key: "no_invoice", width: 20 },
+      { header: "Status", key: "status", width: 15 },
+      { header: "Total Biaya (Rp)", key: "total_biaya", width: 20 },
     ];
 
-    const rows = financeData.recentData.map((item) => [
-      `"${item.no_reg}"`,
-      `"${new Date(item.created_at).toLocaleDateString("id-ID")}"`,
-      `"${item.nama_pasien}"`,
-      `"${item.no_invoice || "-"}"`,
-      `"${item.status_pembayaran}"`,
-      item.total_biaya,
-    ]);
+    // Styling Header (Opsional tapi membuat hasil Excel lebih profesional)
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getRow(1).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFF3F4F6" }, // Warna background abu-abu muda
+    };
 
-    const csvContent =
-      "\uFEFF" +
-      headers.join(",") +
-      "\n" +
-      rows.map((e) => e.join(",")).join("\n");
+    // 3. Masukkan Data ke dalam baris
+    financeData.recentData.forEach((item) => {
+      worksheet.addRow({
+        no_reg: item.no_reg,
+        tanggal: new Date(item.created_at).toLocaleDateString("id-ID"),
+        nama_pasien: item.nama_pasien,
+        no_invoice: item.no_invoice || "-",
+        status: item.status_pembayaran,
+        total_biaya: item.total_biaya,
+      });
+    });
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
+    // 4. Generate File dan Trigger Download
+    try {
+      const buffer = await workbook.xlsx.writeBuffer();
+      const fileName = `Laporan_Keuangan_${period}_${new Date()
+        .toLocaleDateString("id-ID")
+        .replaceAll('/', "-")}.xlsx`;
 
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `Laporan_Keuangan_${period}_${new Date().toLocaleDateString("id-ID")}.csv`,
-    );
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      saveAs(blob, fileName);
+    } catch (error) {
+      console.error("Gagal men-generate file Excel:", error);
+    }
   };
 
   const printPDF = () => {
-    window.print();
+    globalThis.print();
   };
 
   // Helper untuk menampilkan nama periode di cetakan PDF
@@ -159,7 +174,7 @@ export default function FinanceDashboard() {
 
           {/* Export Buttons */}
           <button
-            onClick={exportToCSV}
+            onClick={exportToExcel}
             className="flex-1 lg:flex-none justify-center flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 rounded-lg font-medium text-sm transition-colors"
           >
             <FileText size={16} />{" "}
