@@ -17,6 +17,28 @@ export default function LHUPrintTemplate({ data }) {
     });
   };
 
+  // Helper untuk membuang detik pada waktu (HH:mm:ss -> HH:mm)
+  const formatTime = (timeString) => {
+    if (!timeString) return "-";
+    // Memecah string berdasarkan ":" dan hanya mengambil jam & menit
+    const parts = timeString.split(":");
+    if (parts.length >= 2) {
+      return `${parts[0]}:${parts[1]}`;
+    }
+    return timeString; // Return as is jika formatnya tidak terduga
+  };
+
+  const extractTestCategory = () => {
+    if (!data.jenis_pemeriksaan) return "PEMERIKSAAN LABORATORIUM";
+    return data.jenis_pemeriksaan
+      .replace(/\(\d+\)/g, "")
+      .replace(/,/g, " & ")
+      .trim()
+      .toUpperCase();
+  };
+
+  const masterCategoryName = extractTestCategory();
+
   // Ambil validator dari data registrasi
   const validatorName = data.validator || "dr. Uzi Mardha Phoenna, Sp.PK";
 
@@ -51,7 +73,7 @@ export default function LHUPrintTemplate({ data }) {
 
       {/* INFO PASIEN TABLE */}
       <div className="grid grid-cols-2 gap-8 text-sm mb-6 break-inside-avoid">
-        {/* ... (Bagian Table Kiri Tetap Sama) ... */}
+        {/* TABEL KIRI */}
         <table>
           <tbody>
             <tr>
@@ -79,7 +101,7 @@ export default function LHUPrintTemplate({ data }) {
           </tbody>
         </table>
 
-        {/* ... (Bagian Table Kanan Tetap Sama) ... */}
+        {/* TABEL KANAN */}
         <table>
           <tbody>
             <tr>
@@ -91,12 +113,13 @@ export default function LHUPrintTemplate({ data }) {
               <td>: {formatDate(data.tgl_daftar)}</td>
             </tr>
             <tr>
-              <td className="py-1">Kode Spesimen/Sampel</td>
+              <td className="py-1">Nomor Spesimen/Sampel</td>
               <td>: {data.no_sampel_lab}</td>
             </tr>
             <tr>
               <td className="py-1">Waktu Daftar</td>
-              <td>: {data.waktu_daftar} WIB</td>
+              {/* Implementasi helper formatTime disini */}
+              <td>: {formatTime(data.waktu_daftar)} WIB</td>
             </tr>
             <tr>
               <td className="py-1">Validator</td>
@@ -129,6 +152,15 @@ export default function LHUPrintTemplate({ data }) {
           </tr>
         </thead>
         <tbody>
+          <tr className="bg-gray-50/50 print:bg-gray-50">
+            <td className="border border-black px-2 py-1.5 font-bold uppercase text-left tracking-wide">
+              {masterCategoryName}
+            </td>
+            {/* Sisa kolom dikosongkan untuk baris kategori */}
+            <td className="border border-black px-2 py-1.5"></td>
+            <td className="border border-black px-2 py-1.5"></td>
+            <td className="border border-black px-2 py-1.5"></td>
+          </tr>
           {data.tests &&
             data.tests.map((test, idx) => (
               <tr
@@ -170,12 +202,11 @@ export default function LHUPrintTemplate({ data }) {
             Dokter Penanggung Jawab
           </p>
 
-          {/* IMPLEMENTASI QR CODE DISINI */}
           <div className="py-2">
             <QRCode
               value={qrValidationData}
-              size={90} // Ukuran pas untuk tanda tangan
-              level="M" // Error correction level
+              size={90}
+              level="M"
               style={{ height: "auto", maxWidth: "100%", width: "100%" }}
             />
           </div>

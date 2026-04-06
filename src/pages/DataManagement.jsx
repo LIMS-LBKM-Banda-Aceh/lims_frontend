@@ -22,8 +22,14 @@ import {
   ArrowRight,
   Microscope,
   CheckCircle2,
+  FileText,
 } from "lucide-react";
-import * as XLSX from "xlsx";
+
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
+
 import { toast } from "react-toastify";
 import LHUPrintTemplate from "../components/LHUPrintTemplate";
 import ResultInputModal from "../components/ResultInputModal";
@@ -38,19 +44,18 @@ export default function DataManagement({ onRefreshStats }) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedForPrint, setSelectedForPrint] = useState(null);
-  const [previewData, setPreviewData] = useState(null); // (Sisa state untuk logic ACC/Preview jika diperlukan kedepannya)
+  const [previewData, setPreviewData] = useState(null);
   const [isEditingResult, setIsEditingResult] = useState(false);
 
   // --- NEW STATE FOR SORTING & PAGINATION (UI CONTROL) ---
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState("newest"); // newest, oldest, name_asc
+  const [sortBy, setSortBy] = useState("newest");
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  // Reset page saat filter berubah
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, itemsPerPage]);
@@ -66,13 +71,11 @@ export default function DataManagement({ onRefreshStats }) {
       console.error("Error fetching data:", error);
       toast.error("Gagal memuat data laporan");
     } finally {
-      setTimeout(() => setLoading(false), 500); // Smooth loading
+      setTimeout(() => setLoading(false), 500);
     }
   };
 
-  // --- LOGIC VIEW LAYER (FILTER + SORT + PAGINATION) ---
   const processedData = useMemo(() => {
-    // 1. Filter Search
     let filtered = data.filter(
       (item) =>
         (item.nama_pasien || "")
@@ -84,7 +87,6 @@ export default function DataManagement({ onRefreshStats }) {
           .includes(searchTerm.toLowerCase()),
     );
 
-    // 2. Sorting Logic
     filtered.sort((a, b) => {
       if (sortBy === "newest")
         return new Date(b.created_at) - new Date(a.created_at);
@@ -98,15 +100,12 @@ export default function DataManagement({ onRefreshStats }) {
     return filtered;
   }, [data, searchTerm, sortBy]);
 
-  // 3. Pagination Logic
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return processedData.slice(startIndex, startIndex + itemsPerPage);
   }, [processedData, currentPage, itemsPerPage]);
 
   const totalPages = Math.ceil(processedData.length / itemsPerPage);
-
-  // --- EXISTING LOGIC HANDLERS (UNTOUCHED) ---
 
   const handleOpenPreview = async (id) => {
     const toastId = toast.loading("Memuat rincian hasil...");
@@ -168,8 +167,8 @@ export default function DataManagement({ onRefreshStats }) {
     }
   };
 
+  // REFACTORED: Menggunakan ExcelJS untuk export data kompleks (Merging Cells)
   const exportToExcel = async () => {
-    // Gunakan processedData (hasil filter & sort) untuk export, bukan paginatedData
     if (processedData.length === 0) {
       toast.warn("Tidak ada data untuk diexport");
       return;
@@ -177,6 +176,7 @@ export default function DataManagement({ onRefreshStats }) {
 
     const toastId = toast.loading("Menyiapkan format laporan yang rapi...");
     try {
+      // 1. Ambil data uji detail
       const enrichedData = await Promise.all(
         processedData.map(async (item) => {
           try {
@@ -189,8 +189,54 @@ export default function DataManagement({ onRefreshStats }) {
         }),
       );
 
-      const rawDataRows = [];
-      const merges = [];
+      // 2. Setup Workbook & Worksheet
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Laporan LIMS", {
+        views: [{ showGridLines: true }],
+      });
+
+      // 3. Setup Metadata (Header Laporan)
+      const exportDate = new Date().toLocaleDateString("id-ID", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      const exportTime = new Date().toLocaleTimeString("id-ID");
+
+      // Hitung total baris uji
+      let totalUji = 0;
+      enrichedData.forEach((item) => {
+        totalUji += item.tests && item.tests.length > 0 ? item.tests.length : 1;
+      });
+
+      // Menulis Header Laporan
+      worksheet.addRow(["LAPORAN DATA PEMERIKSAAN LABORATORIUM (LIMS)"]);
+      worksheet.addRow(["BALAI LABORATORIUM KESEHATAN MASYARAKAT BANDA ACEH"]);
+      worksheet.addRow([""]);
+      worksheet.addRow([
+        "Tanggal Export:",
+        `${exportDate} Pukul ${exportTime}`,
+      ]);
+      worksheet.addRow([
+        "Total Data:",
+        `${enrichedData.length} Pasien (${totalUji} Baris Uji)`,
+      ]);
+      worksheet.addRow([
+        "Filter Pencarian:",
+        searchTerm ? `'${searchTerm}'` : "Semua Data",
+      ]);
+      worksheet.addRow([""]);
+
+      // Styling Judul (Baris 1 dan 2)
+      worksheet.mergeCells("A1:R1"); // R = Kolom ke-18
+      worksheet.mergeCells("A2:R2");
+      worksheet.getCell("A1").font = { bold: true, size: 14 };
+      worksheet.getCell("A2").font = { bold: true, size: 12 };
+      worksheet.getCell("A1").alignment = { horizontal: "center" };
+      worksheet.getCell("A2").alignment = { horizontal: "center" };
+
+      // 4. Header Tabel
       const headers = [
         "No",
         "No. Registrasi",
@@ -211,12 +257,22 @@ export default function DataManagement({ onRefreshStats }) {
         "Nilai Rujukan",
         "Metode",
       ];
-      let currentRow = 0;
-      const TOP_OFFSET = 8;
 
+      const headerRow = worksheet.addRow(headers);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFF3F4F6" },
+      };
+      headerRow.alignment = { vertical: "middle", horizontal: "center" };
+
+      // 5. Populate Data dengan Merging
       enrichedData.forEach((item, index) => {
         const tests = item.tests && item.tests.length > 0 ? item.tests : [];
         const rowSpan = tests.length > 0 ? tests.length : 1;
+        const startRow = worksheet.rowCount + 1;
+
         const patientInfo = [
           index + 1,
           item.no_reg,
@@ -243,10 +299,10 @@ export default function DataManagement({ onRefreshStats }) {
               tes.nilai_rujukan || "-",
               tes.metode || "-",
             ];
-            rawDataRows.push(rowData);
+            worksheet.addRow(rowData);
           });
         } else {
-          rawDataRows.push([
+          worksheet.addRow([
             ...patientInfo,
             item.jenis_pemeriksaan,
             "-",
@@ -256,78 +312,216 @@ export default function DataManagement({ onRefreshStats }) {
           ]);
         }
 
+        // Terapkan Merge untuk kolom 1 s/d 13 (Info Pasien) jika rowSpan > 1
         if (rowSpan > 1) {
-          for (let col = 0; col <= 12; col++) {
-            merges.push({
-              s: { r: TOP_OFFSET + currentRow, c: col },
-              e: { r: TOP_OFFSET + currentRow + rowSpan - 1, c: col },
-            });
+          const endRow = startRow + rowSpan - 1;
+          for (let col = 1; col <= 13; col++) {
+            worksheet.mergeCells(startRow, col, endRow, col);
+            // Vertikal alignment top agar rapi
+            worksheet.getCell(startRow, col).alignment = { vertical: "top" };
+          }
+        } else {
+          for (let col = 1; col <= 13; col++) {
+            worksheet.getCell(startRow, col).alignment = { vertical: "top" };
           }
         }
-        currentRow += rowSpan;
       });
 
-      const reportTitle = [["LAPORAN DATA PEMERIKSAAN LABORATORIUM (LIMS)"]];
-      const reportSubtitle = [
-        ["BALAI LABORATORIUM KESEHATAN MASYARAKAT BANDA ACEH"],
-      ];
-      const exportDate = new Date().toLocaleDateString("id-ID", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
+      // 6. Auto-width Columns
+      worksheet.columns.forEach((column) => {
+        let maxLength = 0;
+        column.eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+          // Hanya kalkulasi dari Header tabel ke bawah (abaikan judul metadata)
+          if (rowNumber >= 8) {
+            const columnLength = cell.value ? cell.value.toString().length : 10;
+            if (columnLength > maxLength) maxLength = columnLength;
+          }
+        });
+        column.width = maxLength < 10 ? 10 : maxLength + 2;
       });
-      const exportTime = new Date().toLocaleTimeString("id-ID");
 
-      const metadata = [
-        [""],
-        ["Tanggal Export:", `${exportDate} Pukul ${exportTime}`],
-        [
-          "Total Data:",
-          `${enrichedData.length} Pasien (${rawDataRows.length} Baris Uji)`,
-        ],
-        ["Filter Pencarian:", searchTerm ? `'${searchTerm}'` : "Semua Data"],
-        [""],
-      ];
+      // 7. Write File Buffer
+      const buffer = await workbook.xlsx.writeBuffer();
+      const fileName = `Laporan_LIMS_Clean_${new Date()
+        .toISOString()
+        .slice(0, 10)}.xlsx`;
 
-      const finalData = [
-        ...reportTitle,
-        ...reportSubtitle,
-        ...metadata,
-        headers,
-        ...rawDataRows,
-      ];
-      const worksheet = XLSX.utils.aoa_to_sheet(finalData);
-      const headerMerges = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } },
-        { s: { r: 1, c: 0 }, e: { r: 1, c: headers.length - 1 } },
-      ];
-      worksheet["!merges"] = [...headerMerges, ...merges];
-
-      const colWidths = headers.map((header, colIndex) => {
-        let maxLength = header.length;
-        for (let i = 0; i < Math.min(rawDataRows.length, 50); i++) {
-          const cellValue = rawDataRows[i][colIndex]
-            ? String(rawDataRows[i][colIndex])
-            : "";
-          if (cellValue.length > maxLength) maxLength = cellValue.length;
-        }
-        return { wch: maxLength + 4 };
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
-      worksheet["!cols"] = colWidths;
 
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Laporan LIMS");
-      XLSX.writeFile(
-        workbook,
-        `Laporan_LIMS_Clean_${new Date().toISOString().slice(0, 10)}.xlsx`,
-      );
+      saveAs(blob, fileName);
+
       toast.dismiss(toastId);
       toast.success("Laporan (Clean Layout) berhasil didownload");
     } catch (error) {
       console.error("Error exporting data:", error);
       toast.dismiss(toastId);
       toast.error("Gagal melakukan export data");
+    }
+  };
+
+  const exportToPDF = async () => {
+    if (processedData.length === 0) {
+      toast.warn("Tidak ada data untuk diexport ke PDF");
+      return;
+    }
+
+    const toastId = toast.loading("Menyiapkan dokumen PDF...");
+    try {
+      const enrichedData = await Promise.all(
+        processedData.map(async (item) => {
+          try {
+            const res = await api.get(`/registrations/${item.id}/tests`);
+            const testsData = res.data.success ? res.data.data : [];
+            return { ...item, tests: testsData };
+          } catch (err) {
+            return { ...item, tests: [] };
+          }
+        }),
+      );
+
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const exportDate = new Date().toLocaleDateString("id-ID", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      // --- HEADER SECTION ---
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text(
+        "REKAPITULASI DATA PEMERIKSAAN LABORATORIUM",
+        doc.internal.pageSize.width / 2,
+        15,
+        { align: "center" },
+      );
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(
+        "Balai Laboratorium Kesehatan Masyarakat Banda Aceh",
+        doc.internal.pageSize.width / 2,
+        21,
+        { align: "center" },
+      );
+
+      // --- INFO METADATA (FIX INDENTASI KE x = 10) ---
+      doc.setFontSize(9);
+      // Rata kiri sempurna dengan tabel (margin left: 10)
+      doc.text(`Tanggal Export: ${exportDate}`, 10, 30);
+      doc.text(`Total Data: ${enrichedData.length} Pasien`, 10, 35);
+      if (searchTerm) {
+        doc.text(`Filter Pencarian: "${searchTerm}"`, 10, 40);
+      }
+
+      // --- PREPARE DATA ---
+      const tableColumn = [
+        "No",
+        "No. Registrasi",
+        "Tgl Daftar",
+        "Nama Pasien",
+        "Asal Sampel",
+        "Pengirim",
+        "Parameter Uji",
+        "Status",
+      ];
+
+      const tableRows = [];
+
+      enrichedData.forEach((item, index) => {
+        const parameterUji =
+          item.tests && item.tests.length > 0
+            ? item.tests
+                .map(
+                  (t) =>
+                    t.nama_pemeriksaan || t.parameter_name || "Tidak diketahui",
+                )
+                .join(", ")
+            : "Belum ada uji";
+
+        const rowData = [
+          index + 1,
+          item.no_reg || "-",
+          item.tgl_daftar
+            ? new Date(item.tgl_daftar).toLocaleDateString("id-ID", {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+              })
+            : "-",
+          item.nama_pasien || "-",
+          item.asal_sampel || "-",
+          item.pengirim_instansi || "Mandiri",
+          parameterUji,
+          (item.status || "Belum ada").replace("_", " ").toUpperCase(),
+        ];
+        tableRows.push(rowData);
+      });
+
+      // --- RENDER TABLE ---
+      const startY = searchTerm ? 44 : 39;
+
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: startY,
+        styles: { fontSize: 7, cellPadding: 2 },
+        headStyles: {
+          fillColor: [37, 99, 235],
+          textColor: 255,
+          fontStyle: "bold",
+          halign: "center", // Semua title header rata tengah agar rapi
+        },
+        alternateRowStyles: { fillColor: [243, 244, 246] },
+
+        // --- FIX LEBAR KOLOM PORTRAIT ---
+        columnStyles: {
+          0: { cellWidth: 8, halign: "center" }, // No
+          1: { cellWidth: 24 }, // No Reg (Dilebarkan sedikit)
+          2: { cellWidth: 16, halign: "center" }, // Tgl (Rata tengah agar tgl visualnya seimbang)
+          3: { cellWidth: 28 }, // Nama
+          4: { cellWidth: 16 }, // Asal Sampel (Dikecilkan dari 22 ke 16 karena isi biasanya pendek)
+          5: { cellWidth: 24 }, // Pengirim (Dilebarkan dari 22 ke 24 untuk nama Instansi)
+          6: { cellWidth: "auto" }, // Parameter Uji
+          7: { cellWidth: 22, halign: "center", fontStyle: "bold" }, // Status (Dilebarkan dari 18 ke 22 agar TERDAFTAR muat)
+        },
+        margin: { top: 15, left: 10, right: 10 },
+        didDrawPage: function (data) {
+          let str = "Halaman " + doc.internal.getNumberOfPages();
+          doc.setFontSize(8);
+          doc.text(
+            str,
+            data.settings.margin.left,
+            doc.internal.pageSize.height - 10,
+          );
+        },
+      });
+
+      const fileName = `Recap_LIMS_Portrait_${new Date().toISOString().slice(0, 10)}.pdf`;
+      doc.save(fileName);
+
+      toast.update(toastId, {
+        render: "Laporan PDF berhasil didownload",
+        type: "success",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.update(toastId, {
+        render: "Gagal men-generate laporan PDF",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000,
+      });
     }
   };
 
@@ -384,7 +578,7 @@ export default function DataManagement({ onRefreshStats }) {
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in p-2 md:p-0">
       {/* --- HEADER SECTION --- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 print:hidden">
-        {/* BAGIAN KIRI: Tetap di Kiri */}
+        {/* BAGIAN KIRI */}
         <div className="flex items-center gap-4">
           <div className="p-3 bg-blue-50 rounded-xl text-blue-600">
             <FileBarChart size={28} />
@@ -400,7 +594,6 @@ export default function DataManagement({ onRefreshStats }) {
         </div>
 
         {/* --- CONTROLS & FILTER --- */}
-        {/* PERUBAHAN DISINI: Tambahkan 'md:ml-auto' agar elemen ini terdorong ke kanan */}
         <div className="flex flex-col md:flex-row items-center gap-4 print:hidden md:ml-auto w-full md:w-auto">
           {/* Left: Search & Sort */}
           <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
@@ -450,8 +643,15 @@ export default function DataManagement({ onRefreshStats }) {
           </button>
         </div>
 
-        {/* Action Button (Export) - Posisi ini sekarang akan menempel setelah Controls */}
+        {/* Action Button (Export) */}
         <div className="flex items-center gap-2 w-full md:w-auto">
+          <button
+            onClick={exportToPDF}
+            className="w-full sm:w-auto bg-yellow-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-md shadow-red-200 hover:bg-red-700 hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm"
+            title="Download Rekap PDF"
+          >
+            <FileText size={18} /> Recap PDF
+          </button>
           <button
             onClick={exportToExcel}
             className="w-full md:w-auto bg-green-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md shadow-green-200 hover:bg-green-700 hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm"
@@ -584,11 +784,14 @@ export default function DataManagement({ onRefreshStats }) {
                           </span>
                         )}
 
-                        {(user?.role === "manajemen" || user?.role === "admin") && (
+                        {(user?.role === "manajemen" ||
+                          user?.role === "admin") && (
                           <div className="flex gap-1 ml-2 pl-2 border-l border-gray-200">
                             <button
                               onClick={() =>
-                                navigate(`/registrations/edit/${item.id}`)
+                                navigate(`/registrations/edit/${item.id}`, {
+                                  state: { restrictItems: true },
+                                })
                               }
                               className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600 transition-colors"
                               title="Edit Data Pasien"
@@ -679,7 +882,7 @@ export default function DataManagement({ onRefreshStats }) {
         )}
       </div>
 
-      {/* --- MODAL EDIT HASIL (RE-USE EXISTING COMPONENT) --- */}
+      {/* --- MODAL EDIT HASIL --- */}
       {isEditingResult && previewData && (
         <ResultInputModal
           registrationId={previewData.id}
