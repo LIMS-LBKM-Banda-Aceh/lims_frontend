@@ -23,6 +23,8 @@ import {
   Microscope,
   CheckCircle2,
   FileText,
+  CloudUpload,
+  X, // <-- Icon tambahan untuk tutup modal
 } from "lucide-react";
 
 import jsPDF from "jspdf";
@@ -51,6 +53,29 @@ export default function DataManagement({ onRefreshStats }) {
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState("newest");
+
+  // --- NEW STATE FOR PDF FILTER MODAL ---
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfFilter, setPdfFilter] = useState({
+    type: "month", // 'all', 'month', 'year'
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear(),
+  });
+
+  const months = [
+    { value: 1, label: "Januari" },
+    { value: 2, label: "Februari" },
+    { value: 3, label: "Maret" },
+    { value: 4, label: "April" },
+    { value: 5, label: "Mei" },
+    { value: 6, label: "Juni" },
+    { value: 7, label: "Juli" },
+    { value: 8, label: "Agustus" },
+    { value: 9, label: "September" },
+    { value: 10, label: "Oktober" },
+    { value: 11, label: "November" },
+    { value: 12, label: "Desember" },
+  ];
 
   useEffect(() => {
     fetchData();
@@ -100,6 +125,16 @@ export default function DataManagement({ onRefreshStats }) {
     return filtered;
   }, [data, searchTerm, sortBy]);
 
+  // Generate daftar tahun dinamis dari data registrasi yang ada
+  const availableYears = useMemo(() => {
+    if (!data.length) return [new Date().getFullYear()];
+    const years = data
+      .map((item) => new Date(item.tgl_daftar || item.created_at).getFullYear())
+      .filter((y) => !isNaN(y));
+    const uniqueYears = [...new Set(years)].sort((a, b) => b - a); // Urut dari terbaru
+    return uniqueYears.length ? uniqueYears : [new Date().getFullYear()];
+  }, [data]);
+
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return processedData.slice(startIndex, startIndex + itemsPerPage);
@@ -138,6 +173,37 @@ export default function DataManagement({ onRefreshStats }) {
     toast.success("Data hasil berhasil diperbarui");
   };
 
+  const handleForceBackup = async () => {
+    if (
+      !window.confirm(
+        "Jalankan backup database manual sekarang? Proses ini akan berjalan di latar belakang.",
+      )
+    )
+      return;
+
+    const toastId = toast.loading("Memulai proses backup database...");
+    try {
+      const res = await api.get("/admin/force-backup");
+
+      toast.update(toastId, {
+        render:
+          res.data.message ||
+          "Proses backup manual sedang dijalankan di latar belakang.",
+        type: "info",
+        isLoading: false,
+        autoClose: 5000,
+      });
+    } catch (error) {
+      console.error("Error triggering backup:", error);
+      toast.update(toastId, {
+        render: "Gagal memicu proses backup.",
+        type: "error",
+        isLoading: false,
+        autoClose: 3000,
+      });
+    }
+  };
+
   const handleDelete = async (id) => {
     if (
       globalThis.confirm(
@@ -167,7 +233,6 @@ export default function DataManagement({ onRefreshStats }) {
     }
   };
 
-  // REFACTORED: Menggunakan ExcelJS untuk export data kompleks (Merging Cells)
   const exportToExcel = async () => {
     if (processedData.length === 0) {
       toast.warn("Tidak ada data untuk diexport");
@@ -176,7 +241,6 @@ export default function DataManagement({ onRefreshStats }) {
 
     const toastId = toast.loading("Menyiapkan format laporan yang rapi...");
     try {
-      // 1. Ambil data uji detail
       const enrichedData = await Promise.all(
         processedData.map(async (item) => {
           try {
@@ -189,13 +253,11 @@ export default function DataManagement({ onRefreshStats }) {
         }),
       );
 
-      // 2. Setup Workbook & Worksheet
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Laporan LIMS", {
         views: [{ showGridLines: true }],
       });
 
-      // 3. Setup Metadata (Header Laporan)
       const exportDate = new Date().toLocaleDateString("id-ID", {
         weekday: "long",
         year: "numeric",
@@ -204,13 +266,11 @@ export default function DataManagement({ onRefreshStats }) {
       });
       const exportTime = new Date().toLocaleTimeString("id-ID");
 
-      // Hitung total baris uji
       let totalUji = 0;
       enrichedData.forEach((item) => {
         totalUji += item.tests && item.tests.length > 0 ? item.tests.length : 1;
       });
 
-      // Menulis Header Laporan
       worksheet.addRow(["LAPORAN DATA PEMERIKSAAN LABORATORIUM (LIMS)"]);
       worksheet.addRow(["BALAI LABORATORIUM KESEHATAN MASYARAKAT BANDA ACEH"]);
       worksheet.addRow([""]);
@@ -228,15 +288,13 @@ export default function DataManagement({ onRefreshStats }) {
       ]);
       worksheet.addRow([""]);
 
-      // Styling Judul (Baris 1 dan 2)
-      worksheet.mergeCells("A1:R1"); // R = Kolom ke-18
+      worksheet.mergeCells("A1:R1");
       worksheet.mergeCells("A2:R2");
       worksheet.getCell("A1").font = { bold: true, size: 14 };
       worksheet.getCell("A2").font = { bold: true, size: 12 };
       worksheet.getCell("A1").alignment = { horizontal: "center" };
       worksheet.getCell("A2").alignment = { horizontal: "center" };
 
-      // 4. Header Tabel
       const headers = [
         "No",
         "No. Registrasi",
@@ -267,7 +325,6 @@ export default function DataManagement({ onRefreshStats }) {
       };
       headerRow.alignment = { vertical: "middle", horizontal: "center" };
 
-      // 5. Populate Data dengan Merging
       enrichedData.forEach((item, index) => {
         const tests = item.tests && item.tests.length > 0 ? item.tests : [];
         const rowSpan = tests.length > 0 ? tests.length : 1;
@@ -312,12 +369,10 @@ export default function DataManagement({ onRefreshStats }) {
           ]);
         }
 
-        // Terapkan Merge untuk kolom 1 s/d 13 (Info Pasien) jika rowSpan > 1
         if (rowSpan > 1) {
           const endRow = startRow + rowSpan - 1;
           for (let col = 1; col <= 13; col++) {
             worksheet.mergeCells(startRow, col, endRow, col);
-            // Vertikal alignment top agar rapi
             worksheet.getCell(startRow, col).alignment = { vertical: "top" };
           }
         } else {
@@ -327,11 +382,9 @@ export default function DataManagement({ onRefreshStats }) {
         }
       });
 
-      // 6. Auto-width Columns
       worksheet.columns.forEach((column) => {
         let maxLength = 0;
         column.eachCell({ includeEmpty: true }, (cell, rowNumber) => {
-          // Hanya kalkulasi dari Header tabel ke bawah (abaikan judul metadata)
           if (rowNumber >= 8) {
             const columnLength = cell.value ? cell.value.toString().length : 10;
             if (columnLength > maxLength) maxLength = columnLength;
@@ -340,7 +393,6 @@ export default function DataManagement({ onRefreshStats }) {
         column.width = maxLength < 10 ? 10 : maxLength + 2;
       });
 
-      // 7. Write File Buffer
       const buffer = await workbook.xlsx.writeBuffer();
       const fileName = `Laporan_LIMS_Clean_${new Date()
         .toISOString()
@@ -353,24 +405,44 @@ export default function DataManagement({ onRefreshStats }) {
       saveAs(blob, fileName);
 
       toast.dismiss(toastId);
-      toast.success("Laporan (Clean Layout) berhasil didownload");
+      toast.success("Laporan Excel berhasil didownload");
     } catch (error) {
       console.error("Error exporting data:", error);
       toast.dismiss(toastId);
-      toast.error("Gagal melakukan export data");
+      toast.error("Gagal melakukan export data Excel");
     }
   };
 
-  const exportToPDF = async () => {
-    if (processedData.length === 0) {
-      toast.warn("Tidak ada data untuk diexport ke PDF");
+  const handleGeneratePDF = async () => {
+    setShowPdfModal(false); // Tutup modal saat proses mulai
+
+    // 1. Filter data berdasarkan pilihan modal
+    let filteredForExport = processedData;
+
+    if (pdfFilter.type === "month") {
+      filteredForExport = filteredForExport.filter((item) => {
+        const date = new Date(item.tgl_daftar || item.created_at);
+        return (
+          date.getMonth() + 1 === pdfFilter.month &&
+          date.getFullYear() === pdfFilter.year
+        );
+      });
+    } else if (pdfFilter.type === "year") {
+      filteredForExport = filteredForExport.filter((item) => {
+        const date = new Date(item.tgl_daftar || item.created_at);
+        return date.getFullYear() === pdfFilter.year;
+      });
+    }
+
+    if (filteredForExport.length === 0) {
+      toast.warn("Tidak ada data pada periode yang dipilih");
       return;
     }
 
     const toastId = toast.loading("Menyiapkan dokumen PDF...");
     try {
       const enrichedData = await Promise.all(
-        processedData.map(async (item) => {
+        filteredForExport.map(async (item) => {
           try {
             const res = await api.get(`/registrations/${item.id}/tests`);
             const testsData = res.data.success ? res.data.data : [];
@@ -413,13 +485,24 @@ export default function DataManagement({ onRefreshStats }) {
         { align: "center" },
       );
 
-      // --- INFO METADATA (FIX INDENTASI KE x = 10) ---
+      // Dinamiskan Label Periode
+      let periodeText = "Semua Waktu";
+      if (pdfFilter.type === "month") {
+        const monthLabel = months.find(
+          (m) => m.value === pdfFilter.month,
+        )?.label;
+        periodeText = `Bulan ${monthLabel} ${pdfFilter.year}`;
+      } else if (pdfFilter.type === "year") {
+        periodeText = `Tahun ${pdfFilter.year}`;
+      }
+
+      // --- INFO METADATA ---
       doc.setFontSize(9);
-      // Rata kiri sempurna dengan tabel (margin left: 10)
       doc.text(`Tanggal Export: ${exportDate}`, 10, 30);
-      doc.text(`Total Data: ${enrichedData.length} Pasien`, 10, 35);
+      doc.text(`Periode Data: ${periodeText}`, 10, 35);
+      doc.text(`Total Data: ${enrichedData.length} Pasien`, 10, 40);
       if (searchTerm) {
-        doc.text(`Filter Pencarian: "${searchTerm}"`, 10, 40);
+        doc.text(`Filter Pencarian: "${searchTerm}"`, 10, 45);
       }
 
       // --- PREPARE DATA ---
@@ -467,7 +550,7 @@ export default function DataManagement({ onRefreshStats }) {
       });
 
       // --- RENDER TABLE ---
-      const startY = searchTerm ? 44 : 39;
+      const startY = searchTerm ? 49 : 44; // Sesuaikan agar tidak nabrak text di atas
 
       autoTable(doc, {
         head: [tableColumn],
@@ -478,20 +561,18 @@ export default function DataManagement({ onRefreshStats }) {
           fillColor: [37, 99, 235],
           textColor: 255,
           fontStyle: "bold",
-          halign: "center", // Semua title header rata tengah agar rapi
+          halign: "center",
         },
         alternateRowStyles: { fillColor: [243, 244, 246] },
-
-        // --- FIX LEBAR KOLOM PORTRAIT ---
         columnStyles: {
-          0: { cellWidth: 8, halign: "center" }, // No
-          1: { cellWidth: 24 }, // No Reg (Dilebarkan sedikit)
-          2: { cellWidth: 16, halign: "center" }, // Tgl (Rata tengah agar tgl visualnya seimbang)
-          3: { cellWidth: 28 }, // Nama
-          4: { cellWidth: 16 }, // Asal Sampel (Dikecilkan dari 22 ke 16 karena isi biasanya pendek)
-          5: { cellWidth: 24 }, // Pengirim (Dilebarkan dari 22 ke 24 untuk nama Instansi)
-          6: { cellWidth: "auto" }, // Parameter Uji
-          7: { cellWidth: 22, halign: "center", fontStyle: "bold" }, // Status (Dilebarkan dari 18 ke 22 agar TERDAFTAR muat)
+          0: { cellWidth: 8, halign: "center" },
+          1: { cellWidth: 24 },
+          2: { cellWidth: 16, halign: "center" },
+          3: { cellWidth: 28 },
+          4: { cellWidth: 16 },
+          5: { cellWidth: 24 },
+          6: { cellWidth: "auto" },
+          7: { cellWidth: 22, halign: "center", fontStyle: "bold" },
         },
         margin: { top: 15, left: 10, right: 10 },
         didDrawPage: function (data) {
@@ -505,7 +586,7 @@ export default function DataManagement({ onRefreshStats }) {
         },
       });
 
-      const fileName = `Recap_LIMS_Portrait_${new Date().toISOString().slice(0, 10)}.pdf`;
+      const fileName = `Recap_LIMS_${periodeText.replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.pdf`;
       doc.save(fileName);
 
       toast.update(toastId, {
@@ -643,11 +724,22 @@ export default function DataManagement({ onRefreshStats }) {
           </button>
         </div>
 
-        {/* Action Button (Export) */}
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        {/* Action Button (Export & Backup) */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {/* TOMBOL BACKUP - HANYA ADMIN */}
+          {user?.role === "admin" && (
+            <button
+              onClick={handleForceBackup}
+              className="w-full sm:w-auto bg-slate-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-md shadow-slate-200 hover:bg-slate-800 hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm"
+              title="Force Backup Database ke Google Drive"
+            >
+              <CloudUpload size={18} /> Backup DB
+            </button>
+          )}
+
           <button
-            onClick={exportToPDF}
-            className="w-full sm:w-auto bg-yellow-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-md shadow-red-200 hover:bg-red-700 hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm"
+            onClick={() => setShowPdfModal(true)}
+            className="w-full sm:w-auto bg-yellow-600 text-white px-4 py-2.5 rounded-xl font-bold shadow-md shadow-yellow-200 hover:bg-yellow-700 hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm"
             title="Download Rekap PDF"
           >
             <FileText size={18} /> Recap PDF
@@ -898,6 +990,149 @@ export default function DataManagement({ onRefreshStats }) {
           className="hidden print:block absolute top-0 left-0 w-full h-auto min-h-screen bg-white z-[9999]"
         >
           <LHUPrintTemplate data={selectedForPrint} />
+        </div>
+      )}
+
+      {/* --- MODAL FILTER PDF --- */}
+      {showPdfModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-fade-in print:hidden">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-slide-up">
+            {/* Header Modal */}
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                <FileText size={18} className="text-yellow-600" />
+                Pengaturan Rekap PDF
+              </h3>
+              <button
+                onClick={() => setShowPdfModal(false)}
+                className="p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 rounded-lg transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body Modal */}
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-3">
+                  Tipe Rekapitulasi
+                </label>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-blue-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="pdfType"
+                      value="month"
+                      checked={pdfFilter.type === "month"}
+                      onChange={() =>
+                        setPdfFilter({ ...pdfFilter, type: "month" })
+                      }
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-semibold text-gray-700">
+                      Per Bulan & Tahun
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-blue-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="pdfType"
+                      value="year"
+                      checked={pdfFilter.type === "year"}
+                      onChange={() =>
+                        setPdfFilter({ ...pdfFilter, type: "year" })
+                      }
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-semibold text-gray-700">
+                      Per Tahun
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-blue-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="pdfType"
+                      value="all"
+                      checked={pdfFilter.type === "all"}
+                      onChange={() =>
+                        setPdfFilter({ ...pdfFilter, type: "all" })
+                      }
+                      className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-semibold text-gray-700">
+                      Semua Waktu (All Time)
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Dynamic Selectors */}
+              {pdfFilter.type !== "all" && (
+                <div className="flex gap-3 animate-fade-in">
+                  {pdfFilter.type === "month" && (
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">
+                        Bulan
+                      </label>
+                      <select
+                        value={pdfFilter.month}
+                        onChange={(e) =>
+                          setPdfFilter({
+                            ...pdfFilter,
+                            month: Number(e.target.value),
+                          })
+                        }
+                        className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                      >
+                        {months.map((m) => (
+                          <option key={m.value} value={m.value}>
+                            {m.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">
+                      Tahun
+                    </label>
+                    <select
+                      value={pdfFilter.year}
+                      onChange={(e) =>
+                        setPdfFilter({
+                          ...pdfFilter,
+                          year: Number(e.target.value),
+                        })
+                      }
+                      className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                      {availableYears.map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Modal */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                onClick={() => setShowPdfModal(false)}
+                className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-xl transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleGeneratePDF}
+                className="px-5 py-2 bg-yellow-600 text-white text-sm font-bold rounded-xl shadow-md shadow-yellow-200 hover:bg-yellow-700 hover:shadow-lg transition-all flex items-center gap-2"
+              >
+                <Download size={16} /> Export Sekarang
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

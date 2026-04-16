@@ -4,13 +4,14 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-// --- FIX 1: JANGAN LUPA IMPORT INI ---
 import LandingPage from "./pages/LandingPage";
-// -------------------------------------
-
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import RegistrationEdit from "./pages/RegistrationEdit";
+
+// --- TAMBAHKAN IMPORT INI ---
+import PublicTracking from "./pages/PublicTracking"; 
+// ----------------------------
 
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const { user, loading } = useAuth();
@@ -39,6 +40,11 @@ function App() {
         <Routes>
           {/* Route Halaman Utama (Landing Page) */}
           <Route path="/" element={<LandingPage />} />
+
+          {/* --- TAMBAHKAN ROUTE CEK STATUS DI SINI --- */}
+          {/* Taruh di luar PublicRoute atau ProtectedRoute karena bisa diakses siapa saja */}
+          <Route path="/cek-status" element={<PublicTracking />} />
+          {/* ------------------------------------------ */}
 
           {/* Route Login */}
           <Route
@@ -70,6 +76,7 @@ function App() {
             }
           />
 
+          {/* Fallback Route */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 

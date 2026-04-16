@@ -202,18 +202,17 @@ export default function LHUPrintTemplate({ data }) {
             Dokter Penanggung Jawab
           </p>
 
-          <div className="py-2">
-            <QRCode
+          <div className="py-8">
+            {/* <QRCode
               value={qrValidationData}
               size={90}
               level="M"
               style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-            />
+            /> */}
           </div>
-          <span className="text-[9px] text-gray-400 mb-2">
+          {/* <span className="text-[9px] text-gray-400 mb-2">
             Validasi Digital
-          </span>
-
+          </span> */}
           <p className="font-bold text-sm underline">{validatorName}</p>
         </div>
       </div>

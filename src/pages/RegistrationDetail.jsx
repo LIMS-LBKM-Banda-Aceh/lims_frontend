@@ -574,18 +574,18 @@ export default function RegistrationDetail({ data, onBack }) {
                 <p>Aceh Besar, {formatDate(data.tgl_daftar)}</p>
                 <p>Pengelola PNBP</p>
 
-                <div className="py-2">
-                  <QRCode
+                <div className="py-8">
+                  {/* <QRCode
                     value={qrInvoiceData}
                     size={80}
                     level="M"
                     style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                  />
+                  /> */}
                 </div>
 
-                <span className="text-[9px] text-gray-400 mb-1">
+                {/* <span className="text-[9px] text-gray-400 mb-1">
                   Validasi Digital
-                </span>
+                </span> */}
 
                 <p className="font-bold underline">
                   {currentUser?.fullname ||
