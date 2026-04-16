@@ -122,9 +122,10 @@ const DashboardOverview = ({
             </button>
           </div>
           <RegistrationList
-            data={data.slice(0, 5)}
+            data={data}
             onViewDetail={(item) => onChangeView("detail", item)}
             onRefresh={onRefresh}
+            isDashboard = {true}
           />
         </div>
       )}
