@@ -1,4 +1,3 @@
-// pages/SamplerQueue.jsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import api from "../api/axios";
 import { toast } from "react-toastify";
@@ -24,20 +23,19 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Lock, // <-- Tambahan icon Lock untuk status terkunci
 } from "lucide-react";
 
 export default function SamplerQueue({ onRefreshStats }) {
-  // --- EXISTING STATE ---
   const [activeTab, setActiveTab] = useState("queue");
   const [dataList, setDataList] = useState([]);
   const [masterMap, setMasterMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // --- NEW STATE FOR SORTING & PAGINATION ---
-  const [itemsPerPage, setItemsPerPage] = useState(25); // Default 25 baris
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState("newest"); // Options: newest, oldest, name_asc
+  const [sortBy, setSortBy] = useState("newest");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -50,7 +48,6 @@ export default function SamplerQueue({ onRefreshStats }) {
       if (masterRes.data.success) {
         const map = {};
         masterRes.data.data.forEach((item) => {
-          // MODIFIKASI: Simpan nama_instalasi sebagai value (dengan fallback kategori)
           map[item.nama_pemeriksaan.toLowerCase()] =
             item.nama_instalasi || item.kategori || "SAMPEL UMUM";
         });
@@ -75,7 +72,6 @@ export default function SamplerQueue({ onRefreshStats }) {
     fetchData();
   }, [fetchData]);
 
-  // Reset page ke 1 saat tab atau search berubah agar UX konsisten
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab, searchQuery, itemsPerPage]);
@@ -91,7 +87,6 @@ export default function SamplerQueue({ onRefreshStats }) {
     const detectedInstalasi = new Set();
 
     examNames.forEach((name) => {
-      // MODIFIKASI: Membaca dari masterMap yang sekarang berisi nama_instalasi
       const inst = masterMap[name];
       if (inst) detectedInstalasi.add(inst.toUpperCase());
     });
@@ -107,7 +102,6 @@ export default function SamplerQueue({ onRefreshStats }) {
     return (
       <div className="flex flex-wrap gap-1">
         {Array.from(detectedInstalasi).map((inst) => {
-          // Tetap gunakan keyword untuk menentukan warna badge
           if (
             [
               "HEMATOLOGI",
@@ -205,9 +199,7 @@ export default function SamplerQueue({ onRefreshStats }) {
     );
   };
 
-  // --- LOGIKA FILTER + SORT + PAGINATION ---
   const processedData = useMemo(() => {
-    // 1. Filter Tab & Search
     let filtered = dataList.filter((item) => {
       const matchesTab =
         activeTab === "queue"
@@ -219,7 +211,6 @@ export default function SamplerQueue({ onRefreshStats }) {
       return matchesTab && matchesSearch;
     });
 
-    // 2. Sorting Logic
     filtered.sort((a, b) => {
       if (sortBy === "newest")
         return new Date(b.created_at) - new Date(a.created_at);
@@ -228,14 +219,13 @@ export default function SamplerQueue({ onRefreshStats }) {
       if (sortBy === "name_asc")
         return a.nama_pasien.localeCompare(b.nama_pasien);
       if (sortBy === "urgent")
-        return (b.catatan_tambahan ? 1 : 0) - (a.catatan_tambahan ? 1 : 0); // Prioritas yg ada catatan
+        return (b.catatan_tambahan ? 1 : 0) - (a.catatan_tambahan ? 1 : 0);
       return 0;
     });
 
     return filtered;
   }, [dataList, activeTab, searchQuery, sortBy]);
 
-  // 3. Slicing for Pagination
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return processedData.slice(startIndex, startIndex + itemsPerPage);
@@ -243,11 +233,23 @@ export default function SamplerQueue({ onRefreshStats }) {
 
   const totalPages = Math.ceil(processedData.length / itemsPerPage);
 
-  // --- ACTIONS ---
-  const handleStartSampling = async (id, noReg) => {
+  // --- LOGIC GUARD ---
+  // Pastikan action tertahan jika belum bayar
+  const checkIsUnpaid = (item) => {
+    return item.status_pembayaran === "berbayar" && !item.no_invoice;
+  };
+
+  const handleStartSampling = async (item) => {
+    if (checkIsUnpaid(item)) {
+      toast.warning(
+        `Akses ditolak! Pasien ${item.no_reg} belum menyelesaikan administrasi di Kasir.`,
+      );
+      return;
+    }
+
     try {
-      await api.put(`/registrations/${id}/start-sampling`);
-      toast.info(`Mulai pengambilan sampel: ${noReg}`);
+      await api.put(`/registrations/${item.id}/start-sampling`);
+      toast.info(`Mulai pengambilan sampel: ${item.no_reg}`);
       fetchData();
       if (onRefreshStats) onRefreshStats();
     } catch (err) {
@@ -296,7 +298,6 @@ export default function SamplerQueue({ onRefreshStats }) {
         </div>
 
         <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-          {/* SORTING DROPDOWN (NEW) */}
           <div className="relative group w-full md:w-40">
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
               <ArrowUpDown size={16} />
@@ -380,8 +381,6 @@ export default function SamplerQueue({ onRefreshStats }) {
       {/* Main Table Card */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto min-h-[400px]">
-          {" "}
-          {/* Min height added to prevent jumping */}
           <table className="w-full text-left">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-200">
@@ -436,12 +435,10 @@ export default function SamplerQueue({ onRefreshStats }) {
                     {/* KOLOM 1: Identitas Pasien */}
                     <td className="px-6 py-5 align-top">
                       <div className="flex items-start gap-4">
-                        {/* Avatar */}
                         <div className="w-11 h-11 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-400 shadow-sm group-hover:bg-blue-50 group-hover:text-blue-600 group-hover:border-blue-200 transition-all duration-300 shrink-0 mt-0.5">
                           <User size={20} strokeWidth={2} />
                         </div>
 
-                        {/* Informasi Pasien */}
                         <div className="flex flex-col gap-2">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-semibold text-gray-900 text-sm">
@@ -461,7 +458,6 @@ export default function SamplerQueue({ onRefreshStats }) {
                             </span>
                           </div>
 
-                          {/* Data Teknis (Badge System) */}
                           <div className="flex items-center gap-2 flex-wrap">
                             <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-md">
                               <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
@@ -491,7 +487,6 @@ export default function SamplerQueue({ onRefreshStats }) {
                     <td className="px-6 py-5 align-top">
                       <div className="flex flex-col gap-2.5 max-w-sm">
                         <div className="space-y-1.5">
-                          {/* Container untuk Badge Pemeriksaan */}
                           <div className="flex flex-wrap gap-1.5">
                             {renderSampleBadges(item.jenis_pemeriksaan)}
                           </div>
@@ -503,7 +498,6 @@ export default function SamplerQueue({ onRefreshStats }) {
                           </p>
                         </div>
 
-                        {/* Catatan Tambahan (UI Diperhalus) */}
                         {item.catatan_tambahan && (
                           <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50/80 p-2.5 rounded-lg border border-amber-200/50">
                             <ClipboardList
@@ -518,10 +512,9 @@ export default function SamplerQueue({ onRefreshStats }) {
                       </div>
                     </td>
 
-                    {/* KOLOM 3: Waktu & Status */}
+                    {/* KOLOM 3: Waktu & Status Pembayaran */}
                     <td className="px-6 py-5 align-top">
                       <div className="flex flex-col gap-3">
-                        {/* Waktu Terdaftar */}
                         <div className="flex items-start gap-2">
                           <Clock
                             size={16}
@@ -546,8 +539,13 @@ export default function SamplerQueue({ onRefreshStats }) {
                           </div>
                         </div>
 
-                        {/* Status Animasi */}
-                        {item.status === "proses_sampling" && (
+                        {/* --- UX: STATUS BELUM BAYAR/TERKUNCI --- */}
+                        {checkIsUnpaid(item) ? (
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-red-600 bg-red-50 border border-red-100 w-fit px-2.5 py-1 rounded-md">
+                            <AlertCircle size={12} />
+                            <span>Menunggu Kasir (Belum Bayar)</span>
+                          </div>
+                        ) : item.status === "proses_sampling" ? (
                           <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 w-fit px-2.5 py-1.5 rounded-md">
                             <Syringe
                               size={14}
@@ -557,25 +555,34 @@ export default function SamplerQueue({ onRefreshStats }) {
                               Sedang Diambil
                             </span>
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     </td>
 
                     {/* KOLOM 4: Aksi */}
                     <td className="px-6 py-5 align-top">
-                      <div className="flex justify-end min-w-[140px]">
+                      <div className="flex justify-end min-w-[160px]">
                         {item.status === "terdaftar" ? (
-                          <button
-                            onClick={() =>
-                              handleStartSampling(item.id, item.no_reg)
-                            }
-                            className="group/btn relative overflow-hidden bg-cyan-600 text-white pl-4 pr-11 py-2.5 rounded-xl text-xs font-bold hover:bg-cyan-700 transition-all shadow-sm hover:shadow-cyan-200 active:scale-95 flex items-center justify-between w-full"
-                          >
-                            <span>Proses Sampling</span>
-                            <div className="absolute right-0 top-0 bottom-0 w-9 bg-cyan-700/50 flex items-center justify-center group-hover/btn:w-10 transition-all">
-                              <PlayCircle size={16} />
-                            </div>
-                          </button>
+                          // --- UX: TOMBOL TERKUNCI ---
+                          checkIsUnpaid(item) ? (
+                            <button
+                              disabled
+                              className="relative overflow-hidden bg-gray-100 text-gray-400 px-4 py-2.5 rounded-xl text-[11px] font-bold border border-gray-200 cursor-not-allowed flex items-center justify-center gap-2 w-full"
+                            >
+                              <Lock size={14} />
+                              <span>Terkunci</span>
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleStartSampling(item)}
+                              className="group/btn relative overflow-hidden bg-cyan-600 text-white pl-4 pr-11 py-2.5 rounded-xl text-xs font-bold hover:bg-cyan-700 transition-all shadow-sm hover:shadow-cyan-200 active:scale-95 flex items-center justify-between w-full"
+                            >
+                              <span>Proses Sampling</span>
+                              <div className="absolute right-0 top-0 bottom-0 w-9 bg-cyan-700/50 flex items-center justify-center group-hover/btn:w-10 transition-all">
+                                <PlayCircle size={16} />
+                              </div>
+                            </button>
+                          )
                         ) : (
                           <div className="flex flex-col gap-2 w-full">
                             <button
@@ -587,7 +594,6 @@ export default function SamplerQueue({ onRefreshStats }) {
                               <Send size={14} /> Teruskan Ke Lab
                             </button>
 
-                            {/* Peringatan Label (Menjadi bagian dari grup aksi) */}
                             <div className="flex items-center justify-center gap-1.5 text-[10px] font-bold text-amber-600 bg-amber-50 py-1.5 rounded-lg border border-amber-100">
                               <AlertCircle size={12} />
                               <span>Periksa Label</span>
@@ -603,10 +609,9 @@ export default function SamplerQueue({ onRefreshStats }) {
           </table>
         </div>
 
-        {/* Footer Info & Pagination (MODIFIED) */}
+        {/* Footer Info & Pagination */}
         {!loading && processedData.length > 0 && (
           <div className="bg-gray-50/50 px-6 py-4 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-bold text-gray-500">
-            {/* Left: Total & Rows Per Page */}
             <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
               <span className="whitespace-nowrap">
                 Total: {processedData.length} Pasien
@@ -635,7 +640,6 @@ export default function SamplerQueue({ onRefreshStats }) {
               </div>
             </div>
 
-            {/* Right: Pagination Controls */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}

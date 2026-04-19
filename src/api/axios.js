@@ -1,5 +1,4 @@
-// 
-
+// src/api/axios.js
 import axios from 'axios';
 
 const api = axios.create({
@@ -10,31 +9,29 @@ const api = axios.create({
     }
 });
 
-// Request interceptor untuk menambahkan token
 api.interceptors.request.use(
-    (config) => { 
+    (config) => {
         const token = localStorage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
     },
-    (error) => {
-        return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
 );
 
-// Response interceptor untuk handle errors
 api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response) {
             switch (error.response.status) {
                 case 401:
-                    // Token expired atau tidak valid
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    globalThis.location.href = '/login';
+                    // FIX: Jangan redirect ke /login jika error 401 berasal dari proses login itu sendiri!
+                    if (!error.config.url.includes('/login')) {
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('user');
+                        globalThis.location.href = '/login';
+                    }
                     break;
                 case 403:
                     console.error('Access forbidden:', error.response.data);
@@ -48,10 +45,6 @@ api.interceptors.response.use(
                 default:
                     console.error('API Error:', error.response.data);
             }
-        } else if (error.request) {
-            console.error('No response received:', error.request);
-        } else {
-            console.error('Request setup error:', error.message);
         }
         return Promise.reject(error);
     }

@@ -1,4 +1,5 @@
 // src/components/Sidebar.jsx
+
 import React, { useState } from "react";
 import {
   LayoutDashboard,
@@ -14,13 +15,15 @@ import {
   Syringe,
   FileCheck,
   Wallet,
-  User,       // Tambahan icon
-  KeyRound,   // Tambahan icon
-  Loader2,    // Tambahan icon
-  X,          // Tambahan icon
-  Save        // Tambahan icon
+  User, // Tambahan icon
+  KeyRound, // Tambahan icon
+  Loader2, // Tambahan icon
+  X, // Tambahan icon
+  Save, // Tambahan icon
+  Settings, // Tambahan icon  
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import SystemSettings from "./SystemSettings";
 import api from "../api/axios"; // Sesuaikan path jika berbeda
 import { toast } from "react-toastify";
 
@@ -31,7 +34,7 @@ export default function Sidebar({
   setIsMobileOpen,
 }) {
   const { user, logout } = useAuth();
-  
+
   // State untuk Modal Profile
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
@@ -69,7 +72,7 @@ export default function Sidebar({
       await api.put("/users/profile", payload);
       toast.success("Profil berhasil diperbarui. Halaman akan dimuat ulang.");
       setIsProfileModalOpen(false);
-      
+
       // Reload untuk sinkronisasi ulang data user dari backend ke AuthContext
       setTimeout(() => {
         window.location.reload();
@@ -87,7 +90,11 @@ export default function Sidebar({
 
   // LOGIC MENU BERDASARKAN ROLE (TIDAK ADA YANG DIUBAH)
   if (user?.role === "input" || user?.role === "admin") {
-    menuItems.push({ id: "create", label: "Registrasi Baru", icon: PlusCircle });
+    menuItems.push({
+      id: "create",
+      label: "Registrasi Baru",
+      icon: PlusCircle,
+    });
     menuItems.push({ id: "list", label: "Data Pasien", icon: FileText });
   }
 
@@ -96,15 +103,27 @@ export default function Sidebar({
   }
 
   if (user?.role === "lab" || user?.role === "admin") {
-    menuItems.push({ id: "lab-queue", label: "Antrian Lab", icon: FlaskConical });
+    menuItems.push({
+      id: "lab-queue",
+      label: "Antrian Lab",
+      icon: FlaskConical,
+    });
   }
 
   if (user?.role === "validator" || user?.role === "admin") {
-    menuItems.push({ id: "validation", label: "Validasi Hasil", icon: FileCheck });
+    menuItems.push({
+      id: "validation",
+      label: "Validasi Hasil",
+      icon: FileCheck,
+    });
   }
 
   if (user?.role === "manajemen" || user?.role === "admin") {
-    menuItems.push({ id: "management", label: "Laporan & Data", icon: FileBarChart });
+    menuItems.push({
+      id: "management",
+      label: "Laporan & Data",
+      icon: FileBarChart,
+    });
   }
 
   if (user?.role === "kasir") {
@@ -118,12 +137,23 @@ export default function Sidebar({
   if (user?.role === "admin") {
     menuItems.push(
       { id: "master", label: "Master Data", icon: Database, isAdmin: true },
-      { id: "users", label: "User Management", icon: UserCog, isAdmin: true }
+      { id: "users", label: "User Management", icon: UserCog, isAdmin: true },
+      {
+        id: "settings",
+        label: "Pengaturan Sistem",
+        icon: Settings,
+        isAdmin: true,
+      },
     );
   }
 
   if (user?.role === "lab") {
-    menuItems.push({ id: "master", label: "Master Data", icon: Database, isAdmin: true });
+    menuItems.push({
+      id: "master",
+      label: "Master Data",
+      icon: Database,
+      isAdmin: true,
+    });
   }
 
   return (
@@ -143,7 +173,11 @@ export default function Sidebar({
       >
         {/* Logo Header */}
         <div className="h-20 flex items-center gap-3 px-6 border-b border-gray-50 flex-none">
-          <img src="/logo.svg" alt="Labkesmas Logo" className="mx-auto h-12 w-auto" />
+          <img
+            src="/logo.svg"
+            alt="Labkesmas Logo"
+            className="mx-auto h-12 w-auto"
+          />
         </div>
 
         {/* Menu Items Area */}
@@ -174,13 +208,19 @@ export default function Sidebar({
                   <item.icon
                     size={20}
                     className={
-                      isActive ? "text-cyan-600" : "text-gray-400 group-hover:text-gray-600"
+                      isActive
+                        ? "text-cyan-600"
+                        : "text-gray-400 group-hover:text-gray-600"
                     }
                   />
                   {item.label}
                 </div>
-                {isActive && <ChevronRight size={16} className="text-cyan-500" />}
-                {item.isAdmin && !isActive && <ShieldCheck size={14} className="text-cyan-300" />}
+                {isActive && (
+                  <ChevronRight size={16} className="text-cyan-500" />
+                )}
+                {item.isAdmin && !isActive && (
+                  <ShieldCheck size={14} className="text-cyan-300" />
+                )}
               </button>
             );
           })}
@@ -189,7 +229,6 @@ export default function Sidebar({
         {/* Footer dengan User Info */}
         <div className="w-full p-4 border-t border-gray-50 bg-white flex-none">
           <div className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-gray-50 border border-gray-100 transition-all duration-200 hover:shadow-md hover:border-blue-100 group">
-            
             <div className="flex items-center gap-3 overflow-hidden">
               {/* === AVATAR DIBUAT BISA DIKLIK === */}
               <div
@@ -240,7 +279,9 @@ export default function Sidebar({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <h3 className="font-bold text-lg text-gray-800">Update Profil Saya</h3>
+              <h3 className="font-bold text-lg text-gray-800">
+                Update Profil Saya
+              </h3>
               <button
                 onClick={() => setIsProfileModalOpen(false)}
                 className="text-gray-400 hover:text-gray-600"

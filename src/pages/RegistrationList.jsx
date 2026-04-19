@@ -312,7 +312,7 @@ export default function RegistrationList({
                               className="flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 px-1.5 py-[2px] rounded text-[9px] font-extrabold tracking-wide cursor-help shadow-sm"
                               title="Perhatian: Nomor Invoice belum diset / disimpan!"
                             >
-                              <AlertCircle size={10} strokeWidth={2.5} /> NO INV
+                              <AlertCircle size={10} strokeWidth={2.5} /> Belum bayar
                             </span>
                           )}
                         </div>
