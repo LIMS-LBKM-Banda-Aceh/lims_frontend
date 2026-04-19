@@ -1,6 +1,4 @@
-// pages/RegistrationList.jsx
-
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Eye,
   Edit,
@@ -15,6 +13,8 @@ import {
   ListFilter,
   ArrowRight,
   AlertCircle,
+  ChevronLeft, // <-- Tambahkan icon untuk pagination
+  ChevronRight, // <-- Tambahkan icon untuk pagination
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
@@ -22,7 +22,6 @@ import { toast } from "react-toastify";
 import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
 
-// Tambahkan prop isDashboard di sini
 export default function RegistrationList({
   data,
   onViewDetail,
@@ -34,7 +33,16 @@ export default function RegistrationList({
 
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("desc");
-  const [rowsLimit, setRowsLimit] = useState(25);
+
+  // --- PAGINATION STATE ---
+  // Default limit 5 untuk dashboard, 25 untuk halaman list utama
+  const [rowsLimit, setRowsLimit] = useState(isDashboard ? 5 : 25);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset ke halaman 1 jika user melakukan pencarian atau mengubah limit baris
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, rowsLimit]);
 
   const formatDateSafe = (dateString) => {
     if (!dateString) return "-";
@@ -82,13 +90,8 @@ export default function RegistrationList({
 
     let result = [...data];
 
-    // Jika di dashboard, skip filter/sort agar performa lebih cepat
-    if (isDashboard) {
-      return result;
-    }
-
-    // 1. Searching
-    if (searchTerm) {
+    // 1. Searching (Tetap jalan meski di dashboard agar data rapi jika dibutuhkan)
+    if (searchTerm && !isDashboard) {
       const lowerTerm = searchTerm.toLowerCase();
       result = result.filter(
         (item) =>
@@ -99,27 +102,32 @@ export default function RegistrationList({
       );
     }
 
-    // 2. Sorting (BEST PRACTICE - FIXED)
+    // 2. Sorting
     result.sort((a, b) => {
-      // PERUBAHAN DISINI: Gunakan 'created_at' sebagai prioritas utama karena ada jam & menitnya.
-      // Kita beri fallback ke 'tgl_daftar' just in case data lamanya tidak punya created_at.
       const dateA = new Date(a?.created_at || a?.tgl_daftar).getTime();
       const dateB = new Date(b?.created_at || b?.tgl_daftar).getTime();
 
-      // Fallback ke 0 jika tanggal Invalid (menghasilkan NaN)
       const timeA = Number.isNaN(dateA) ? 0 : dateA;
       const timeB = Number.isNaN(dateB) ? 0 : dateB;
 
       if (sortOrder === "asc") {
-        return timeA - timeB; // Terlama (dari yang paling kecil/lama)
+        return timeA - timeB;
       } else {
-        return timeB - timeA; // Terbaru (dari yang paling besar/baru)
+        return timeB - timeA;
       }
     });
 
-    // 3. Limiting
-    return result.slice(0, rowsLimit);
-  }, [data, searchTerm, sortOrder, rowsLimit, isDashboard]);
+    // NOTE: Hapus return result.slice() di sini. Pemotongan dilakukan oleh Pagination Logic di bawah.
+    return result;
+  }, [data, searchTerm, sortOrder, isDashboard]);
+
+  // --- LOGIC: PAGINATION ---
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * rowsLimit;
+    return processedData.slice(startIndex, startIndex + rowsLimit);
+  }, [processedData, currentPage, rowsLimit]);
+
+  const totalPages = Math.ceil(processedData.length / rowsLimit) || 1;
 
   const StatusBadge = ({ status }) => {
     const styles = {
@@ -150,8 +158,6 @@ export default function RegistrationList({
       .toUpperCase();
   };
 
-  // --- NEW LAYOUT RENDER ---
-  // Style Container: Jika dashboard, hilangkan shadow/border/rounded agar flat menyatu dengan parent
   const containerClass = isDashboard
     ? "overflow-hidden"
     : "bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden";
@@ -181,9 +187,7 @@ export default function RegistrationList({
             </div>
           </div>
 
-          {/* Controls Area (Search & Sort) */}
           <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-            {/* SORT DROPDOWN */}
             <div className="relative group w-full md:w-40">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 <ArrowUpDown size={16} />
@@ -202,7 +206,6 @@ export default function RegistrationList({
               />
             </div>
 
-            {/* SEARCH INPUT */}
             <div className="relative w-full md:w-64">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -223,8 +226,6 @@ export default function RegistrationList({
       {/* --- TABLE CARD --- */}
       <div className={containerClass}>
         <div className="overflow-x-auto min-h-[150px]">
-          {" "}
-          {/* Min height adjusted for dashboard */}
           <table className="w-full text-left text-sm">
             <thead className="bg-gray-50/50 border-b border-gray-200">
               <tr>
@@ -259,7 +260,7 @@ export default function RegistrationList({
                     </div>
                   </td>
                 </tr>
-              ) : processedData.length === 0 ? (
+              ) : paginatedData.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="py-12">
                     <div className="flex flex-col items-center justify-center text-center">
@@ -271,12 +272,13 @@ export default function RegistrationList({
                   </td>
                 </tr>
               ) : (
-                processedData.map((item) => (
+                // PASTIKAN MAP DARI paginatedData BUKAN processedData
+                paginatedData.map((item) => (
                   <tr
                     key={item.id}
                     className="hover:bg-blue-50/30 transition-colors group"
                   >
-                    {/* Kolom 1: Pasien */}
+                    {/* ... (Kolom-kolom Table `td` tidak ada yang berubah, gunakan *render* aslimu di sini) ... */}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-xl bg-linear-to-br from-blue-100 to-cyan-100 flex items-center justify-center text-blue-600 font-bold text-xs border border-blue-100 shrink-0">
@@ -299,27 +301,21 @@ export default function RegistrationList({
                       </div>
                     </td>
 
-                    {/* Kolom 2: No Reg */}
                     <td className="px-6 py-4">
                       <div className="flex flex-col items-start gap-1.5">
-                        {/* Gunakan flex-wrap agar responsif di layar kecil */}
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
                             {item.no_reg}
                           </span>
-
-                          {/* --- UX IMPROVEMENT: Badge Notice Invoice Kosong --- */}
                           {!item.no_invoice && (
                             <span
                               className="flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 px-1.5 py-[2px] rounded text-[9px] font-extrabold tracking-wide cursor-help shadow-sm"
                               title="Perhatian: Nomor Invoice belum diset / disimpan!"
                             >
-                              <AlertCircle size={10} strokeWidth={2.5} /> NO INV
+                              <AlertCircle size={10} strokeWidth={2.5} /> Belum bayar
                             </span>
                           )}
-                          {/* --------------------------------------------------- */}
                         </div>
-
                         <div className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
                           No Sampel:{" "}
                           <span className="text-gray-600 font-semibold">
@@ -329,7 +325,6 @@ export default function RegistrationList({
                       </div>
                     </td>
 
-                    {/* Kolom 3: Pemeriksaan (Simplified for Dashboard) */}
                     <td className="px-6 py-4">
                       <div
                         className="max-w-[150px] truncate font-medium text-gray-800 text-sm"
@@ -337,7 +332,6 @@ export default function RegistrationList({
                       >
                         {item.jenis_pemeriksaan}
                       </div>
-                      {/* Hide details in dashboard to save space */}
                       {!isDashboard && (
                         <>
                           <div className="flex items-center gap-2 mt-1">
@@ -360,7 +354,6 @@ export default function RegistrationList({
                       )}
                     </td>
 
-                    {/* Kolom 4: Status */}
                     <td className="px-6 py-4">
                       <div className="flex flex-col items-start gap-1.5">
                         <StatusBadge status={item.status} />
@@ -372,7 +365,6 @@ export default function RegistrationList({
                       </div>
                     </td>
 
-                    {/* Kolom 5: Aksi */}
                     <td className="px-6 py-4 text-center">
                       <div className="flex justify-center items-center gap-1">
                         <button
@@ -382,8 +374,6 @@ export default function RegistrationList({
                         >
                           <Eye size={18} />
                         </button>
-
-                        {/* Action Edit/Hapus disembunyikan di dashboard untuk keamanan/keringkasan */}
                         {!isDashboard &&
                           (user?.role === "admin" ||
                             (user?.role === "input" &&
@@ -420,52 +410,64 @@ export default function RegistrationList({
           </table>
         </div>
 
-        {/* --- FOOTER INFO (HANYA TAMPIL JIKA BUKAN DASHBOARD) --- */}
-        {!isDashboard && (
+        {/* --- DYNAMIC FOOTER INFO & PAGINATION --- */}
+        {processedData.length > 0 && (
           <div className="bg-gray-50/50 px-6 py-4 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-bold text-gray-500">
-            {/* Left: Total Data */}
-            <div className="flex items-center gap-2">
-              <span>Total Data: {data ? data.length : 0} Pasien</span>
-              {searchTerm && (
-                <span className="text-blue-600">
-                  (Difilter: {processedData.length})
+            {/* Left: Total & Limit Control */}
+            <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
+              <span className="whitespace-nowrap">
+                Total: {data ? data.length : 0} Data
+                {searchTerm &&
+                  !isDashboard &&
+                  ` (Difilter: ${processedData.length})`}
+              </span>
+
+              <div className="flex items-center gap-2 pl-4 border-l border-gray-200">
+                <span className="text-gray-400 hidden sm:inline">
+                  Tampilkan:
                 </span>
-              )}
-            </div>
-
-            {/* Right: Limit Control */}
-            <div className="flex items-center gap-2 border-l border-gray-200 pl-4">
-              <span className="text-gray-400 hidden sm:inline">Tampilkan:</span>
-              <div className="relative">
-                <select
-                  value={rowsLimit}
-                  onChange={(e) => setRowsLimit(Number(e.target.value))}
-                  className="bg-white border border-gray-200 text-gray-700 py-1 pl-2 pr-6 rounded-lg appearance-none cursor-pointer focus:ring-2 focus:ring-blue-500 outline-none"
-                >
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-                <ListFilter
-                  size={12}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                />
+                <div className="relative">
+                  <select
+                    value={rowsLimit}
+                    onChange={(e) => setRowsLimit(Number(e.target.value))}
+                    className="bg-white border border-gray-200 text-gray-700 py-1 pl-2 pr-6 rounded-lg appearance-none cursor-pointer focus:ring-2 focus:ring-blue-500 outline-none"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                  <ListFilter
+                    size={12}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                  />
+                </div>
               </div>
-              <span className="text-gray-400 ml-1">Baris</span>
             </div>
-          </div>
-        )}
 
-        {/* Footer dekoratif untuk dashboard */}
-        {isDashboard && data?.length > 0 && (
-          <div className="bg-gray-50 px-6 py-2 border-t border-gray-100 text-[10px] text-gray-400 text-center font-medium">
-            Menampilkan 5 data registrasi terbaru
-          </div>
-        )}
-
-        {!isDashboard && (
-          <div className="bg-gray-50 px-6 py-2 border-t border-gray-200 text-[10px] text-gray-400 font-bold flex justify-end items-center gap-1">
-            Sistem LIMS <ArrowRight size={10} /> Registrasi
+            {/* Right: Pagination Navigation */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <span className="px-2">
+                Hal {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                }
+                disabled={currentPage === totalPages}
+                className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
         )}
       </div>

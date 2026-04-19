@@ -13,6 +13,7 @@ import {
   PackageCheck,
   PlusCircle,
   Syringe,
+  Settings,
 } from "lucide-react";
 
 // Components
@@ -27,6 +28,7 @@ import DataManagement from "./DataManagement";
 import ValidationQueue from "./ValidationQueue";
 import SamplerQueue from "./SamplerQueue";
 import FinanceDashboard from "./FinanceDashboard";
+import SystemSettings from "../components/SystemSettings";
 
 const StatCard = ({ title, value, icon: Icon, color, subtext }) => (
   <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-start justify-between hover:shadow-md transition-shadow">
@@ -122,9 +124,10 @@ const DashboardOverview = ({
             </button>
           </div>
           <RegistrationList
-            data={data.slice(0, 5)}
+            data={data}
             onViewDetail={(item) => onChangeView("detail", item)}
             onRefresh={onRefresh}
+            isDashboard={true}
           />
         </div>
       )}
@@ -305,7 +308,6 @@ export default function Dashboard() {
                   onBack={() => setView("list")}
                 />
               )}
-
               {view === "lab-queue" && (
                 <LabQueue onRefreshStats={fetchMainData} />
               )}
@@ -315,12 +317,12 @@ export default function Dashboard() {
               {view === "validation" && (
                 <ValidationQueue onRefreshStats={fetchMainData} />
               )}
-
               {view === "management" && (
                 <DataManagement onRefreshStats={fetchMainData} />
               )}
               {view === "master" && <MasterPemeriksaan />}
               {view === "users" && <UserManagement />}
+              {view === "settings" && <SystemSettings />}
             </div>
           )}
         </main>

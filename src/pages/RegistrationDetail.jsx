@@ -29,6 +29,21 @@ export default function RegistrationDetail({ data, onBack }) {
   const [lastInvoice, setLastInvoice] = useState("");
   const [isInvoiceSaved, setIsInvoiceSaved] = useState(false);
   const [loadingSave, setLoadingSave] = useState(false);
+  const [signatureMode, setSignatureMode] = useState("qr");
+
+  useEffect(() => {
+    const fetchSignatureMode = async () => {
+      try {
+        const res = await api.get("/settings");
+        if (res.data.success && res.data.data.signature_mode) {
+          setSignatureMode(res.data.data.signature_mode);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil pengaturan signature", error);
+      }
+    };
+    fetchSignatureMode();
+  }, []);
 
   // Fetch riwayat invoice terakhir khusus untuk Kasir / Admin
   useEffect(() => {
@@ -68,11 +83,11 @@ export default function RegistrationDetail({ data, onBack }) {
           setInvoiceNo(`${nextSeq}/690798/PNBP/${year}`);
         } else {
           setInvoiceBaseSeq("1"); //
-          setInvoiceNo(`1/690798/PNBP/${year}`); // 
+          setInvoiceNo(`1/690798/PNBP/${year}`); //
         }
       } else {
-        setInvoiceBaseSeq("1"); 
-        setInvoiceNo(`1/690798/PNBP/${year}`); 
+        setInvoiceBaseSeq("1");
+        setInvoiceNo(`1/690798/PNBP/${year}`);
       }
     }
   }, [data, lastInvoice]);
@@ -575,18 +590,27 @@ export default function RegistrationDetail({ data, onBack }) {
                 <p>Pengelola PNBP</p>
 
                 <div className="py-2">
-                  <QRCode
-                    value={qrInvoiceData}
-                    size={80}
-                    level="M"
-                    style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                  />
+                  {signatureMode === "qr" ? (
+                    <QRCode
+                      value={qrInvoiceData}
+                      size={80}
+                      level="M"
+                      style={{
+                        height: "auto",
+                        maxWidth: "100%",
+                        width: "100%",
+                      }}
+                    />
+                  ) : (
+                    // Beri ruang kosong untuk TTD Kasir
+                    <div className="h-14 w-full"></div>
+                  )}
                 </div>
-
-                <span className="text-[9px] text-gray-400 mb-1">
-                  Validasi Digital
-                </span>
-
+                {signatureMode === "qr" && (
+                  <span className="text-[9px] text-gray-400 mb-1 block">
+                    Dokumen ini di tandatangani secara elektronik
+                  </span>
+                )}
                 <p className="font-bold underline">
                   {currentUser?.fullname ||
                     currentUser?.username ||

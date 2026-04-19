@@ -1,10 +1,29 @@
 // src/components/LHUPrintTemplate.jsx
-
-import React from "react";
+// 1. PASTIKAN import useState dan useEffect ditambahkan di sini
+import React, { useState, useEffect } from "react";
 import kopMailImg from "../assets/kop_mail.png";
 import QRCode from "react-qr-code";
+import api from "../api/axios";
 
 export default function LHUPrintTemplate({ data }) {
+  // 2. LETAKKAN KODE STATE DAN EFFECT DI SINI (PALING ATAS)
+  const [signatureMode, setSignatureMode] = useState("qr");
+
+  useEffect(() => {
+    const fetchSignatureMode = async () => {
+      try {
+        const res = await api.get("/settings");
+        if (res.data.success && res.data.data.signature_mode) {
+          setSignatureMode(res.data.data.signature_mode);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil pengaturan signature", error);
+      }
+    };
+    fetchSignatureMode();
+  }, []);
+
+  // 3. Posisikan early return SETELAH hooks
   if (!data) return null;
 
   // Helper untuk format tanggal konsisten (Indonesia)
@@ -42,7 +61,7 @@ export default function LHUPrintTemplate({ data }) {
   // Ambil validator dari data registrasi
   const validatorName = data.validator || "dr. Uzi Mardha Phoenna, Sp.PK";
 
-  // Create QR Value String (Data validasi yang akan muncul saat di-scan)
+  // Siapkan data untuk QR Code (jika mode QR)
   const qrValidationData = JSON.stringify({
     rs: "BLKM Banda Aceh",
     reg: data.no_reg,
@@ -189,7 +208,7 @@ export default function LHUPrintTemplate({ data }) {
       {/* FOOTER TTD & QR CODE */}
       <div className="flex justify-end mt-8 break-inside-avoid page-break-inside-avoid">
         <div className="flex flex-col items-center justify-center text-center w-64">
-          <p className="mb-4">
+          <p className="">
             Aceh Besar,{" "}
             {data.validated_at
               ? formatDate(data.validated_at)
@@ -203,17 +222,25 @@ export default function LHUPrintTemplate({ data }) {
           </p>
 
           <div className="py-2">
-            <QRCode
-              value={qrValidationData}
-              size={90}
-              level="M"
-              style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-            />
+            {signatureMode === "qr" ? (
+              <QRCode
+                value={qrValidationData}
+                size={90}
+                level="M"
+                style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+              />
+            ) : (
+              // Beri ruang kosong untuk TTD Manual basah
+              <div className="h-16 w-full"></div>
+            )}
           </div>
-          <span className="text-[9px] text-gray-400 mb-2">
-            Validasi Digital
-          </span>
 
+          {/* Opsional: Teks validasi digital hanya muncul jika mode QR */}
+          {signatureMode === "qr" && (
+            <span className="text-[9px] text-gray-400 mb-1 block">
+              Dokumen ini ditandatangani secara elektronik
+            </span>
+          )}
           <p className="font-bold text-sm underline">{validatorName}</p>
         </div>
       </div>
