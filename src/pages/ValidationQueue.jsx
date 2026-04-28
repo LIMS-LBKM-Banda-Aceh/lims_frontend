@@ -25,67 +25,162 @@ import {
   ArrowUp,
   ArrowDown,
   AlertCircle,
-  Layers, // <-- Ditambahkan icon Layers untuk grup
+  Layers,
 } from "lucide-react";
 import { toast } from "react-toastify";
 
-// --- UI/UX HELPER: Digunakan untuk memberi warna di tabel validasi ---
-export const analyzeResult = (nilai, rujukan) => {
-  if (!nilai || !rujukan) return "normal";
+// --- ROBUST SMART PARSER (Sinkronisasi dengan Input Lab) ---
+export const parseRefConfig = (rujukanString) => {
+  try {
+    if (!rujukanString) return { jenis: "teks", teks_bebas: "-" };
 
-  const valStr = String(nilai).trim().toLowerCase();
-  const refStr = String(rujukan).trim().toLowerCase();
+    let minified;
+    if (typeof rujukanString === "string") {
+      if (!rujukanString.trim().startsWith("{")) {
+        return { jenis: "teks", teks_bebas: rujukanString };
+      }
+      try {
+        minified = JSON.parse(rujukanString);
+      } catch (e) {
+        return { jenis: "teks", teks_bebas: "Format terpotong / Data Lama" };
+      }
+    } else {
+      minified = rujukanString;
+    }
 
-  // 1. Kualitatif (Teks)
-  if (
-    ["negatif", "positif", "normal", "reaktif", "non reaktif"].some((kw) =>
-      refStr.includes(kw),
+    if (minified.jenis) return minified;
+
+    if (minified.j === "kan") {
+      return {
+        jenis: "kuantitatif",
+        beda_gender: minified.bg,
+        kuantitatif: {
+          umum: minified.u || { min: "", max: "" },
+          L: minified.L || { min: "", max: "" },
+          P: minified.P || { min: "", max: "" },
+        },
+      };
+    } else if (minified.j === "kal") {
+      return {
+        jenis: "kualitatif",
+        kualitatif: {
+          opsi: minified.o || "Negatif, Positif",
+          normal: minified.n || "Negatif",
+        },
+      };
+    } else if (minified.j === "txt") {
+      return {
+        jenis: "teks",
+        teks_bebas: minified.v || "-",
+      };
+    }
+
+    return { jenis: "teks", teks_bebas: "-" };
+  } catch {
+    return { jenis: "teks", teks_bebas: "Format tidak valid" };
+  }
+};
+
+export const getDisplayRefRange = (config, gender) => {
+  if (!config) return "-";
+  if (config.jenis === "teks") return config.teks_bebas || "-";
+  if (config.jenis === "kualitatif")
+    return `Normal: ${config.kualitatif?.normal || "-"}`;
+  if (config.jenis === "kuantitatif") {
+    let target = config.kuantitatif?.umum;
+
+    if (config.beda_gender) {
+      if (gender === "L" && config.kuantitatif?.L)
+        target = config.kuantitatif.L;
+      else if (gender === "P" && config.kuantitatif?.P)
+        target = config.kuantitatif.P;
+      else if (config.kuantitatif?.L) target = config.kuantitatif.L;
+    }
+
+    if (
+      target &&
+      target.min !== undefined &&
+      target.max !== undefined &&
+      target.min !== "" &&
+      target.max !== ""
     )
-  ) {
-    if (refStr.includes("negatif") && !valStr.includes("negatif"))
-      return "abnormal";
-    if (refStr.includes("non reaktif") && !valStr.includes("non reaktif"))
-      return "abnormal";
-    if (refStr.includes("normal") && !valStr.includes("normal"))
-      return "abnormal";
-    return "normal";
+      return `${target.min} - ${target.max}`;
+    return "-";
+  }
+  return "-";
+};
+
+export const smartAnalyzeResult = (nilai, config, gender) => {
+  if (!nilai || nilai.toString().trim() === "") return "normal";
+
+  if (config.jenis === "kualitatif") {
+    const valStr = String(nilai).trim().toLowerCase();
+    const expected = String(config.kualitatif?.normal || "")
+      .trim()
+      .toLowerCase();
+    return valStr !== expected ? "abnormal" : "normal";
   }
 
-  // 2. Kuantitatif (Angka)
-  // Konversi koma desimal, pastikan hanya angka dan titik saja yg di-parse
-  const valNum = parseFloat(valStr.replace(/,/g, ".").replace(/[^0-9.-]/g, ""));
-  if (isNaN(valNum)) return "normal";
+  if (config.jenis === "kuantitatif") {
+    const valNum = parseFloat(String(nilai).replace(/,/g, "."));
+    if (isNaN(valNum)) return "normal";
 
-  if (refStr.includes("<")) {
-    const refNum = parseFloat(
-      refStr.replace(/[^0-9.,]/g, "").replace(/,/g, "."),
-    );
-    if (!isNaN(refNum) && valNum > refNum) return "high";
-  }
+    let target = config.kuantitatif?.umum;
+    if (config.beda_gender) {
+      if (gender === "L" && config.kuantitatif?.L)
+        target = config.kuantitatif.L;
+      else if (gender === "P" && config.kuantitatif?.P)
+        target = config.kuantitatif.P;
+      else if (config.kuantitatif?.L) target = config.kuantitatif.L;
+    }
 
-  if (refStr.includes(">")) {
-    const refNum = parseFloat(
-      refStr.replace(/[^0-9.,]/g, "").replace(/,/g, "."),
-    );
-    if (!isNaN(refNum) && valNum < refNum) return "low";
-  }
-
-  // Cek Range (Memperbaiki kegagalan split akibat en-dash, em-dash, tilde, atau minus unicode)
-  const rangeRegex = /[-–—−~]|s\/d|sampai|to/i;
-  if (rangeRegex.test(refStr)) {
-    const parts = refStr
-      .split(rangeRegex)
-      .map((p) => parseFloat(p.replace(/[^0-9.,]/g, "").replace(/,/g, ".")))
-      .filter((n) => !isNaN(n));
-
-    if (parts.length >= 2) {
-      const min = Math.min(parts[0], parts[1]);
-      const max = Math.max(parts[0], parts[1]);
-      if (valNum < min) return "low";
-      if (valNum > max) return "high";
+    if (
+      target &&
+      target.min !== undefined &&
+      target.max !== undefined &&
+      target.min !== "" &&
+      target.max !== ""
+    ) {
+      if (valNum < parseFloat(target.min)) return "low";
+      if (valNum > parseFloat(target.max)) return "high";
     }
   }
 
+  if (config.jenis === "teks" && config.teks_bebas) {
+    const valStr = String(nilai).trim().toLowerCase();
+    const refStr = String(config.teks_bebas).trim().toLowerCase();
+    const valNum = parseFloat(
+      valStr.replace(/,/g, ".").replace(/[^0-9.-]/g, ""),
+    );
+
+    if (!isNaN(valNum)) {
+      if (refStr.includes("<")) {
+        const refNum = parseFloat(
+          refStr.replace(/[^0-9.,]/g, "").replace(/,/g, "."),
+        );
+        if (!isNaN(refNum) && valNum > refNum) return "high";
+      }
+      if (refStr.includes(">")) {
+        const refNum = parseFloat(
+          refStr.replace(/[^0-9.,]/g, "").replace(/,/g, "."),
+        );
+        if (!isNaN(refNum) && valNum < refNum) return "low";
+      }
+      const rangeRegex = /[-–—−~]|s\/d|sampai|to/i;
+      if (rangeRegex.test(refStr)) {
+        const parts = refStr
+          .split(rangeRegex)
+          .map((p) => parseFloat(p.replace(/[^0-9.,]/g, "").replace(/,/g, ".")))
+          .filter((n) => !isNaN(n));
+        if (parts.length >= 2) {
+          const min = Math.min(parts[0], parts[1]);
+          const max = Math.max(parts[0], parts[1]);
+          if (valNum < min) return "low";
+          if (valNum > max) return "high";
+        }
+      }
+    }
+  }
   return "normal";
 };
 // -----------------------------------------------------
@@ -275,7 +370,6 @@ export default function ValidationQueue({ onRefreshStats }) {
     }
   };
 
-  // LOGIKA BARU: Grouping data berdasarkan pemeriksaan_name untuk Modal Validasi
   const groupedTests = previewData?.tests?.reduce((acc, test) => {
     const groupName = test.pemeriksaan_name || "Pemeriksaan Lainnya / Tunggal";
     if (!acc[groupName]) acc[groupName] = [];
@@ -453,7 +547,6 @@ export default function ValidationQueue({ onRefreshStats }) {
           </table>
         </div>
 
-        {/* FOOTER PAGINATION */}
         {!loading && processedData.length > 0 && (
           <div className="bg-gray-50/50 px-6 py-4 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-bold text-gray-500">
             <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
@@ -507,7 +600,6 @@ export default function ValidationQueue({ onRefreshStats }) {
         )}
       </div>
 
-      {/* MODAL PREVIEW & ACC */}
       {previewData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -629,7 +721,6 @@ export default function ValidationQueue({ onRefreshStats }) {
                       </tr>
                     </thead>
 
-                    {/* LOOPING BERDASARKAN GRUP PEMERIKSAAN */}
                     {groupedTests &&
                       Object.entries(groupedTests).map(
                         ([groupName, groupItems]) => (
@@ -637,7 +728,6 @@ export default function ValidationQueue({ onRefreshStats }) {
                             key={groupName}
                             className="divide-y divide-gray-100/70 border-b-4 border-gray-100"
                           >
-                            {/* BARIS SEPARATOR GRUP */}
                             <tr className="bg-gray-50/80">
                               <td
                                 colSpan="5"
@@ -653,11 +743,20 @@ export default function ValidationQueue({ onRefreshStats }) {
                               </td>
                             </tr>
 
-                            {/* BARIS ITEM PARAMETER */}
                             {groupItems.map((test) => {
-                              const status = analyzeResult(
+                              // IMPLEMENTASI SMART PARSER BARU
+                              const config = parseRefConfig(
+                                test.nilai_rujukan || test.range_normal,
+                              );
+                              const gender = previewData.jenis_kelamin || "L";
+                              const displayRef = getDisplayRefRange(
+                                config,
+                                gender,
+                              );
+                              const status = smartAnalyzeResult(
                                 test.nilai,
-                                test.nilai_rujukan,
+                                config,
+                                gender,
                               );
                               const isAbnormal = status !== "normal";
 
@@ -671,11 +770,7 @@ export default function ValidationQueue({ onRefreshStats }) {
                                   </td>
 
                                   <td
-                                    className={`px-5 py-3 text-center transition-colors ${
-                                      isAbnormal
-                                        ? "bg-red-100/50"
-                                        : "bg-emerald-50/30"
-                                    }`}
+                                    className={`px-5 py-3 text-center transition-colors ${isAbnormal ? "bg-red-100/50" : "bg-emerald-50/30"}`}
                                   >
                                     {editingTestId === test.id ? (
                                       <div className="flex items-center gap-2 justify-center">
@@ -715,11 +810,7 @@ export default function ValidationQueue({ onRefreshStats }) {
                                     ) : (
                                       <div className="flex items-center justify-between group/cell relative">
                                         <span
-                                          className={`flex-1 flex items-center justify-center gap-1.5 text-base ${
-                                            isAbnormal
-                                              ? "text-red-600 font-extrabold"
-                                              : "text-gray-900 font-bold"
-                                          }`}
+                                          className={`flex-1 flex items-center justify-center gap-1.5 text-base ${isAbnormal ? "text-red-600 font-extrabold" : "text-gray-900 font-bold"}`}
                                         >
                                           {test.nilai}
                                           {status === "high" && (
@@ -734,12 +825,13 @@ export default function ValidationQueue({ onRefreshStats }) {
                                               className="text-red-500 stroke-[3px]"
                                             />
                                           )}
-                                          {status === "abnormal" && (
-                                            <AlertCircle
-                                              size={16}
-                                              className="text-red-500 stroke-[3px]"
-                                            />
-                                          )}
+                                          {status === "abnormal" &&
+                                            config.jenis !== "kuantitatif" && (
+                                              <AlertCircle
+                                                size={16}
+                                                className="text-red-500 stroke-[3px]"
+                                              />
+                                            )}
                                         </span>
                                         <button
                                           onClick={() => handleStartEdit(test)}
@@ -753,13 +845,16 @@ export default function ValidationQueue({ onRefreshStats }) {
                                   </td>
 
                                   <td className="px-5 py-3 text-gray-500 text-xs font-mono">
-                                    {test.satuan}
+                                    {test.satuan || "-"}
                                   </td>
+
+                                  {/* DISPLAY HASIL PARSING DI SINI */}
                                   <td className="px-5 py-3 text-gray-600 text-xs font-medium">
-                                    {test.nilai_rujukan}
+                                    {displayRef}
                                   </td>
+
                                   <td className="px-5 py-3 text-gray-500 text-[10px] uppercase tracking-wider">
-                                    {test.metode}
+                                    {test.metode || "-"}
                                   </td>
                                 </tr>
                               );
@@ -791,7 +886,7 @@ export default function ValidationQueue({ onRefreshStats }) {
                 <button
                   onClick={handleApprove}
                   disabled={processingAcc || editingTestId !== null}
-                  className="px-6 py-2.5 rounded-xl bg-linear-to-r from-emerald-600 to-green-600 text-white font-bold text-sm hover:shadow-lg hover:shadow-emerald-200 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 text-white font-bold text-sm hover:shadow-lg hover:shadow-emerald-200 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {processingAcc ? (
                     <>

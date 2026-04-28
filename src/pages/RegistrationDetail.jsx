@@ -127,6 +127,25 @@ export default function RegistrationDetail({ data, onBack }) {
     }).format(num || 0);
   };
 
+  const formatTime = (timeData) => {
+    if (!timeData) return "00:00";
+
+    // Jika backend mengirim format jam murni (e.g., "14:30:00" atau "14:30")
+    if (typeof timeData === "string" && /^\d{2}:\d{2}/.test(timeData)) {
+      return timeData.substring(0, 5);
+    }
+
+    // Jika backend mengirim ISO Date String dari Prisma
+    const dateObj = new Date(timeData);
+    if (!isNaN(dateObj.getTime())) {
+      const h = String(dateObj.getHours()).padStart(2, "0");
+      const m = String(dateObj.getMinutes()).padStart(2, "0");
+      return `${h}:${m}`;
+    }
+
+    return "00:00";
+  };
+
   const qrInvoiceData = JSON.stringify({
     type: "INVOICE_PNBP",
     reg: data.no_reg,
@@ -556,7 +575,7 @@ export default function RegistrationDetail({ data, onBack }) {
                     <span className="text-gray-500">Waktu Daftar</span>
                     <span className="col-span-2">
                       {formatDate(data.tgl_daftar)} —{" "}
-                      {data.waktu_daftar?.slice(0, 5) || "00:00"} WIB
+                      {formatTime(data.waktu_daftar)} WIB
                     </span>
                   </div>
                   {data.catatan_tambahan && (

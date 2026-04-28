@@ -239,10 +239,10 @@ export default function RegistrationEdit() {
   const [error, setError] = useState(null);
 
   // State Master Data
+  const [isRestrictedMode, setIsRestrictedMode] = useState(false);
   const [masterPemeriksaan, setMasterPemeriksaan] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
   const [totalBiaya, setTotalBiaya] = useState(0);
-  const isRestrictedMode = location.state?.restrictItems || false;
 
   // State Nomor Sampel
   const [baseSequence, setBaseSequence] = useState("");
@@ -288,15 +288,33 @@ export default function RegistrationEdit() {
           masterList = masterRes.data.data;
           setMasterPemeriksaan(masterList);
         }
-
         if (seqRes.data.success) {
           setLastSampleString(seqRes.data.last_sample_string);
         }
-
         const data = res.data.data;
+        // Jika status BUKAN terdaftar, paksa UI menjadi Restricted Mode (Read-Only untuk pemeriksaan)
+        if (data.status !== "terdaftar") {
+          setIsRestrictedMode(true);
+        } else {
+          // Fallback ke routing state jika statusnya masih terdaftar tapi mau dikunci paksa dari page lain
+          setIsRestrictedMode(location.state?.restrictItems || false);
+        }
         const formatDate = (d) =>
           d ? new Date(d).toISOString().split("T")[0] : "";
-        const formatTime = (t) => (t && t.length >= 5 ? t.substring(0, 5) : "");
+        const formatTime = (t) => {
+          if (!t) return "";
+          const dateObj = new Date(t);
+
+          // Cek apakah parsing berhasil
+          if (!isNaN(dateObj.getTime())) {
+            const h = String(dateObj.getHours()).padStart(2, "0");
+            const m = String(dateObj.getMinutes()).padStart(2, "0");
+            return `${h}:${m}`;
+          }
+
+          // Fallback jika t ternyata formatnya sudah "HH:mm:ss"
+          return t.length >= 5 ? t.substring(0, 5) : "";
+        };
 
         setForm({
           ...data,
@@ -469,6 +487,8 @@ export default function RegistrationEdit() {
     }
   }, [form.tgl_lahir]);
 
+  // Di dalam komponen RegistrationEdit
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -502,10 +522,23 @@ export default function RegistrationEdit() {
       ...cleanForm
     } = form;
 
+    // FIX 1: Pastikan fields numerik di-cast secara eksplisit
     const payload = {
       ...cleanForm,
+      umur:
+        cleanForm.umur !== "" && cleanForm.umur !== null
+          ? Number(cleanForm.umur)
+          : null,
       items: selectedItems.map((item) => ({ id: item.id, qty: item.qty })),
     };
+
+    // Hanya kirim array items jika sedang TIDAK dalam mode terkunci
+    if (!isRestrictedMode) {
+      payload.items = selectedItems.map((item) => ({
+        id: item.id,
+        qty: item.qty,
+      }));
+    }
 
     Object.keys(payload).forEach((k) => {
       if (payload[k] === "") payload[k] = null;
@@ -517,7 +550,19 @@ export default function RegistrationEdit() {
       navigate("/dashboard");
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || "Gagal menyimpan perubahan");
+
+      // FIX 2: Bulletproof error extraction
+      let errorMessage = "Gagal menyimpan perubahan";
+      if (err.response?.data?.message) {
+        errorMessage =
+          typeof err.response.data.message === "string"
+            ? err.response.data.message
+            : JSON.stringify(err.response.data.message);
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
       toast.error("Gagal menyimpan");
     } finally {
       setSaving(false);
@@ -645,7 +690,10 @@ export default function RegistrationEdit() {
           {error && (
             <div className="mx-6 mt-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-3">
               <AlertCircle size={20} />
-              <span>{error}</span>
+              {/* Stringify object untuk mencegah White Screen of Death */}
+              <span>
+                {typeof error === "object" ? JSON.stringify(error) : error}
+              </span>
             </div>
           )}
 
