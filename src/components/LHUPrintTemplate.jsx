@@ -1,12 +1,113 @@
-// src/components/LHUPrintTemplate.jsx
-// 1. PASTIKAN import useState dan useEffect ditambahkan di sini
 import React, { useState, useEffect } from "react";
 import kopMailImg from "../assets/kop_mail.png";
 import QRCode from "react-qr-code";
 import api from "../api/axios";
+import { formatDate, formatTime } from "../utils/dateHelper";
+
+// --- SMART PARSER ---
+const parseRefConfig = (rujukanString) => {
+  try {
+    if (!rujukanString) return { jenis: "teks", teks_bebas: "-" };
+
+    let minified;
+    if (typeof rujukanString === "string") {
+      if (!rujukanString.trim().startsWith("{")) {
+        return { jenis: "teks", teks_bebas: rujukanString };
+      }
+      try {
+        minified = JSON.parse(rujukanString);
+      } catch (e) {
+        return { jenis: "teks", teks_bebas: "Format terpotong / Data Lama" };
+      }
+    } else {
+      minified = rujukanString;
+    }
+
+    if (minified.jenis) return minified;
+
+    if (minified.j === "kan") {
+      return {
+        jenis: "kuantitatif",
+        beda_gender: minified.bg,
+        kuantitatif: {
+          umum: minified.u || { min: "", max: "" },
+          L: minified.L || { min: "", max: "" },
+          P: minified.P || { min: "", max: "" },
+        },
+      };
+    } else if (minified.j === "kal") {
+      return {
+        jenis: "kualitatif",
+        kualitatif: {
+          opsi: minified.o || "Negatif, Positif",
+          normal: minified.n || "Negatif",
+        },
+      };
+    } else if (minified.j === "txt") {
+      return {
+        jenis: "teks",
+        teks_bebas: minified.v || "-",
+      };
+    }
+
+    return { jenis: "teks", teks_bebas: "-" };
+  } catch {
+    return { jenis: "teks", teks_bebas: "Format tidak valid" };
+  }
+};
+
+// --- UI/UX RENDERER KHUSUS LHU ---
+// Parameter kedua `satuan` ditambahkan untuk merender satuan di samping angka
+const renderLhuReference = (config, satuan) => {
+  if (!config) return "-";
+
+  // Amankan format satuan (hanya tampil jika valid)
+  const unitText =
+    satuan && satuan !== "-" && satuan.trim() !== "" ? ` ${satuan}` : "";
+
+  // [BEST PRACTICE]: Jangan tempel satuan ke teks_bebas, karena biasanya admin sudah
+  // mengetik satuan secara manual di dalam teks bebas tersebut.
+  if (config.jenis === "teks") return config.teks_bebas || "-";
+
+  if (config.jenis === "kualitatif") return config.kualitatif?.normal || "-";
+
+  if (config.jenis === "kuantitatif") {
+    if (config.beda_gender) {
+      const lMin = config.kuantitatif?.L?.min || "-";
+      const lMax = config.kuantitatif?.L?.max || "-";
+      const pMin = config.kuantitatif?.P?.min || "-";
+      const pMax = config.kuantitatif?.P?.max || "-";
+
+      return (
+        <div className="text-left inline-block text-[12px] leading-snug whitespace-nowrap">
+          <div>
+            <span className="font-semibold">Laki-laki</span> : {lMin} - {lMax}
+            {unitText}
+          </div>
+          <div>
+            <span className="font-semibold">Perempuan</span> : {pMin} - {pMax}
+            {unitText}
+          </div>
+        </div>
+      );
+    } else {
+      const umum = config.kuantitatif?.umum;
+      if (
+        umum &&
+        umum.min !== undefined &&
+        umum.max !== undefined &&
+        umum.min !== "" &&
+        umum.max !== ""
+      ) {
+        return `${umum.min} - ${umum.max}${unitText}`;
+      }
+    }
+  }
+  return "-";
+};
+// ---------------------------------
 
 export default function LHUPrintTemplate({ data }) {
-  // 2. LETAKKAN KODE STATE DAN EFFECT DI SINI (PALING ATAS)
   const [signatureMode, setSignatureMode] = useState("qr");
 
   useEffect(() => {
@@ -23,29 +124,7 @@ export default function LHUPrintTemplate({ data }) {
     fetchSignatureMode();
   }, []);
 
-  // 3. Posisikan early return SETELAH hooks
   if (!data) return null;
-
-  // Helper untuk format tanggal konsisten (Indonesia)
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  };
-
-  // Helper untuk membuang detik pada waktu (HH:mm:ss -> HH:mm)
-  const formatTime = (timeString) => {
-    if (!timeString) return "-";
-    // Memecah string berdasarkan ":" dan hanya mengambil jam & menit
-    const parts = timeString.split(":");
-    if (parts.length >= 2) {
-      return `${parts[0]}:${parts[1]}`;
-    }
-    return timeString; // Return as is jika formatnya tidak terduga
-  };
 
   const extractTestCategory = () => {
     if (!data.jenis_pemeriksaan) return "PEMERIKSAAN LABORATORIUM";
@@ -57,11 +136,8 @@ export default function LHUPrintTemplate({ data }) {
   };
 
   const masterCategoryName = extractTestCategory();
-
-  // Ambil validator dari data registrasi
   const validatorName = data.validator || "dr. Uzi Mardha Phoenna, Sp.PK";
 
-  // Siapkan data untuk QR Code (jika mode QR)
   const qrValidationData = JSON.stringify({
     rs: "BLKM Banda Aceh",
     reg: data.no_reg,
@@ -92,7 +168,6 @@ export default function LHUPrintTemplate({ data }) {
 
       {/* INFO PASIEN TABLE */}
       <div className="grid grid-cols-2 gap-8 text-sm mb-6 break-inside-avoid">
-        {/* TABEL KIRI */}
         <table>
           <tbody>
             <tr>
@@ -120,7 +195,6 @@ export default function LHUPrintTemplate({ data }) {
           </tbody>
         </table>
 
-        {/* TABEL KANAN */}
         <table>
           <tbody>
             <tr>
@@ -137,7 +211,6 @@ export default function LHUPrintTemplate({ data }) {
             </tr>
             <tr>
               <td className="py-1">Waktu Daftar</td>
-              {/* Implementasi helper formatTime disini */}
               <td>: {formatTime(data.waktu_daftar)} WIB</td>
             </tr>
             <tr>
@@ -175,33 +248,39 @@ export default function LHUPrintTemplate({ data }) {
             <td className="border border-black px-2 py-1.5 font-bold uppercase text-left tracking-wide">
               {masterCategoryName}
             </td>
-            {/* Sisa kolom dikosongkan untuk baris kategori */}
             <td className="border border-black px-2 py-1.5"></td>
             <td className="border border-black px-2 py-1.5"></td>
             <td className="border border-black px-2 py-1.5"></td>
           </tr>
           {data.tests &&
-            data.tests.map((test, idx) => (
-              <tr
-                key={idx}
-                className="break-inside-avoid page-break-inside-avoid"
-              >
-                <td className="border border-black p-2">
-                  {test.parameter_name}
-                </td>
-                <td className="border border-black p-2 text-center font-bold">
-                  {test.nilai}
-                </td>
-                <td className="border border-black p-2 text-center">
-                  {test.nilai_rujukan}
-                </td>
-                <td className="border border-black p-2 text-center">
-                  {test.satuan}
-                  <br />
-                  <span className="text-[10px] uppercase">{test.metode}</span>
-                </td>
-              </tr>
-            ))}
+            data.tests.map((test, idx) => {
+              const config = parseRefConfig(
+                test.nilai_rujukan || test.range_normal,
+              );
+
+              return (
+                <tr
+                  key={idx}
+                  className="break-inside-avoid page-break-inside-avoid"
+                >
+                  <td className="border border-black p-2">
+                    {test.parameter_name}
+                  </td>
+                  <td className="border border-black p-2 text-center font-bold">
+                    {test.nilai}
+                  </td>
+                  <td className="border border-black p-2 text-center align-middle">
+                    {/* Render dengan pelemparan variabel Satuan */}
+                    {renderLhuReference(config, test.satuan)}
+                  </td>
+                  <td className="border border-black p-2 text-center">
+                    {test.satuan}
+                    <br />
+                    <span className="text-[10px] uppercase">{test.metode}</span>
+                  </td>
+                </tr>
+              );
+            })}
         </tbody>
       </table>
 
@@ -230,12 +309,10 @@ export default function LHUPrintTemplate({ data }) {
                 style={{ height: "auto", maxWidth: "100%", width: "100%" }}
               />
             ) : (
-              // Beri ruang kosong untuk TTD Manual basah
               <div className="h-16 w-full"></div>
             )}
           </div>
 
-          {/* Opsional: Teks validasi digital hanya muncul jika mode QR */}
           {signatureMode === "qr" && (
             <span className="text-[9px] text-gray-400 mb-1 block">
               Dokumen ini ditandatangani secara elektronik

@@ -12,84 +12,165 @@ import {
   Layers,
 } from "lucide-react";
 
-// --- UI/UX HELPER: Analisis Hasil vs Nilai Rujukan ---
-export const analyzeResult = (nilai, rujukan) => {
-  if (!nilai || !rujukan) return "normal";
+// --- ROBUST SMART PARSER FIX ---
+export const parseRefConfig = (rujukanString) => {
+  try {
+    if (!rujukanString) return { jenis: "teks", teks_bebas: "-" };
 
-  const valStr = String(nilai).trim().toLowerCase();
-  const refStr = String(rujukan).trim().toLowerCase();
+    let minified;
+    if (typeof rujukanString === "string") {
+      // Jika string biasa (tidak mirip objek JSON)
+      if (!rujukanString.trim().startsWith("{")) {
+        return { jenis: "teks", teks_bebas: rujukanString };
+      }
+      // [FIX]: Mencegah JSON terpotong terekspos mentah-mentah ke UI
+      try {
+        minified = JSON.parse(rujukanString);
+      } catch (e) {
+        return { jenis: "teks", teks_bebas: "Format terpotong / Data Lama" };
+      }
+    } else {
+      minified = rujukanString;
+    }
 
-  // 1. Kualitatif (Teks)
-  if (
-    ["negatif", "positif", "normal", "reaktif", "non reaktif"].some((kw) =>
-      refStr.includes(kw),
+    if (minified.jenis) return minified;
+
+    if (minified.j === "kan") {
+      return {
+        jenis: "kuantitatif",
+        beda_gender: minified.bg,
+        kuantitatif: {
+          umum: minified.u || { min: "", max: "" },
+          L: minified.L || { min: "", max: "" },
+          P: minified.P || { min: "", max: "" },
+        },
+      };
+    } else if (minified.j === "kal") {
+      return {
+        jenis: "kualitatif",
+        kualitatif: {
+          opsi: minified.o || "Negatif, Positif",
+          normal: minified.n || "Negatif",
+        },
+      };
+    } else if (minified.j === "txt") {
+      return {
+        jenis: "teks",
+        teks_bebas: minified.v || "-",
+      };
+    }
+
+    return { jenis: "teks", teks_bebas: "-" };
+  } catch {
+    return { jenis: "teks", teks_bebas: "Format tidak valid" };
+  }
+};
+
+export const getDisplayRefRange = (config, gender) => {
+  if (!config) return "-";
+  if (config.jenis === "teks") return config.teks_bebas || "-";
+  if (config.jenis === "kualitatif")
+    return `${config.kualitatif?.normal || "-"}`;
+  if (config.jenis === "kuantitatif") {
+    let target = config.kuantitatif?.umum; // fallback default
+
+    // [FIX]: Jangan mereturn "-" kosong apabila array gender tidak lengkap di DB
+    if (config.beda_gender) {
+      if (gender === "L" && config.kuantitatif?.L)
+        target = config.kuantitatif.L;
+      else if (gender === "P" && config.kuantitatif?.P)
+        target = config.kuantitatif.P;
+      else if (config.kuantitatif?.L) target = config.kuantitatif.L;
+    }
+
+    if (
+      target &&
+      target.min !== undefined &&
+      target.max !== undefined &&
+      target.min !== "" &&
+      target.max !== ""
     )
-  ) {
-    if (refStr.includes("negatif") && !valStr.includes("negatif"))
-      return "abnormal";
-    if (refStr.includes("non reaktif") && !valStr.includes("non reaktif"))
-      return "abnormal";
-    if (refStr.includes("normal") && !valStr.includes("normal"))
-      return "abnormal";
-    return "normal";
+      return `${target.min} - ${target.max}`;
+    return "-";
+  }
+  return "-";
+};
+
+export const smartAnalyzeResult = (nilai, config, gender) => {
+  if (!nilai || nilai.toString().trim() === "") return "normal";
+
+  if (config.jenis === "kualitatif") {
+    const valStr = String(nilai).trim().toLowerCase();
+    const expected = String(config.kualitatif?.normal || "")
+      .trim()
+      .toLowerCase();
+    return valStr !== expected ? "abnormal" : "normal";
   }
 
-  // 2. Kuantitatif (Angka)
-  // Tangani spasi dan koma Indo -> Titik desimal
-  const valNum = parseFloat(valStr.replace(/,/g, ".").replace(/[^0-9.-]/g, ""));
-  if (isNaN(valNum)) return "normal";
+  if (config.jenis === "kuantitatif") {
+    const valNum = parseFloat(String(nilai).replace(/,/g, "."));
+    if (isNaN(valNum)) return "normal";
 
-  // Cek Kurang Dari (<)
-  if (refStr.includes("<")) {
-    const refNum = parseFloat(
-      refStr.replace(/[^0-9.,]/g, "").replace(/,/g, "."),
-    );
-    if (!isNaN(refNum) && valNum > refNum) return "high";
-  }
+    let target = config.kuantitatif?.umum;
+    if (config.beda_gender) {
+      if (gender === "L" && config.kuantitatif?.L)
+        target = config.kuantitatif.L;
+      else if (gender === "P" && config.kuantitatif?.P)
+        target = config.kuantitatif.P;
+      else if (config.kuantitatif?.L) target = config.kuantitatif.L;
+    }
 
-  // Cek Lebih Dari (>)
-  if (refStr.includes(">")) {
-    const refNum = parseFloat(
-      refStr.replace(/[^0-9.,]/g, "").replace(/,/g, "."),
-    );
-    if (!isNaN(refNum) && valNum < refNum) return "low";
-  }
-
-  // Cek Range (Toleransi semua jenis Dash: hyphen, en-dash, em-dash, minus matematis)
-  const rangeRegex = /[-–—−~]|s\/d|sampai|to/i;
-  if (rangeRegex.test(refStr)) {
-    const parts = refStr
-      .split(rangeRegex)
-      .map((p) => parseFloat(p.replace(/[^0-9.,]/g, "").replace(/,/g, ".")))
-      .filter((n) => !isNaN(n));
-
-    if (parts.length >= 2) {
-      const min = Math.min(parts[0], parts[1]);
-      const max = Math.max(parts[0], parts[1]);
-      if (valNum < min) return "low";
-      if (valNum > max) return "high";
+    if (
+      target &&
+      target.min !== undefined &&
+      target.max !== undefined &&
+      target.min !== "" &&
+      target.max !== ""
+    ) {
+      if (valNum < parseFloat(target.min)) return "low";
+      if (valNum > parseFloat(target.max)) return "high";
     }
   }
 
+  if (config.jenis === "teks" && config.teks_bebas) {
+    const valStr = String(nilai).trim().toLowerCase();
+    const refStr = String(config.teks_bebas).trim().toLowerCase();
+    const valNum = parseFloat(
+      valStr.replace(/,/g, ".").replace(/[^0-9.-]/g, ""),
+    );
+
+    if (!isNaN(valNum)) {
+      if (refStr.includes("<")) {
+        const refNum = parseFloat(
+          refStr.replace(/[^0-9.,]/g, "").replace(/,/g, "."),
+        );
+        if (!isNaN(refNum) && valNum > refNum) return "high";
+      }
+      if (refStr.includes(">")) {
+        const refNum = parseFloat(
+          refStr.replace(/[^0-9.,]/g, "").replace(/,/g, "."),
+        );
+        if (!isNaN(refNum) && valNum < refNum) return "low";
+      }
+      const rangeRegex = /[-–—−~]|s\/d|sampai|to/i;
+      if (rangeRegex.test(refStr)) {
+        const parts = refStr
+          .split(rangeRegex)
+          .map((p) => parseFloat(p.replace(/[^0-9.,]/g, "").replace(/,/g, ".")))
+          .filter((n) => !isNaN(n));
+        if (parts.length >= 2) {
+          const min = Math.min(parts[0], parts[1]);
+          const max = Math.max(parts[0], parts[1]);
+          if (valNum < min) return "low";
+          if (valNum > max) return "high";
+        }
+      }
+    }
+  }
   return "normal";
 };
 
-// --- UI/UX HELPER: Deteksi Dropdown Kualitatif ---
-const isQualitative = (rujukan) => {
-  if (!rujukan) return false;
-  const r = String(rujukan).toLowerCase();
-  return ["negatif", "positif", "normal", "reaktif", "non reaktif"].some((kw) =>
-    r.includes(kw),
-  );
-};
-
-const getQualitativeOptions = (rujukan) => {
-  const r = String(rujukan).toLowerCase();
-  if (r.includes("reaktif")) return ["Non Reaktif", "Reaktif"];
-  if (r.includes("normal")) return ["Normal", "Abnormal"];
-  return ["Negatif", "Positif"];
-};
-// -----------------------------------------------------
+// ------------------------------------
 
 export default function ResultInputModal({
   registrationId,
@@ -142,7 +223,6 @@ export default function ResultInputModal({
     const isConfirmed = window.confirm(
       `Apakah Anda yakin ingin menyimpan ${tests.length} hasil tes ini? \n\nPastikan data sudah benar karena akan diverifikasi.`,
     );
-
     if (!isConfirmed) return;
 
     try {
@@ -163,9 +243,7 @@ export default function ResultInputModal({
     }
   };
 
-  // LOGIKA BARU: Grouping data berdasarkan pemeriksaan_name
   const groupedTests = tests.reduce((acc, test) => {
-    // Jika data lama belum ada pemeriksaan_name (null), masukkan ke 'Pemeriksaan Lainnya'
     const groupName = test.pemeriksaan_name || "Pemeriksaan Lainnya / Tunggal";
     if (!acc[groupName]) acc[groupName] = [];
     acc[groupName].push(test);
@@ -175,7 +253,6 @@ export default function ResultInputModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
       <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Header Modal */}
         <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-cyan-50">
           <h3 className="font-bold text-lg text-cyan-800 flex items-center gap-2">
             <TestTube2 size={20} /> Input Hasil Lab: {noSampel}
@@ -189,7 +266,6 @@ export default function ResultInputModal({
           </button>
         </div>
 
-        {/* Body Modal */}
         <div className="p-0 overflow-y-auto flex-1 custom-scrollbar">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12">
@@ -207,7 +283,7 @@ export default function ResultInputModal({
                   <th className="pb-3 pt-4 pl-6 font-bold">Parameter Uji</th>
                   <th className="pb-3 pt-4 text-center font-bold">Metode</th>
                   <th className="pb-3 pt-4 font-bold">Nilai Rujukan</th>
-                  <th className="pb-3 pt-4 w-56 text-center font-bold">
+                  <th className="pb-3 pt-4 w-64 text-center font-bold">
                     Hasil Uji
                   </th>
                   <th className="pb-3 pt-4 text-center w-24 font-bold">
@@ -219,13 +295,11 @@ export default function ResultInputModal({
                 </tr>
               </thead>
 
-              {/* LOOPING BERDASARKAN GRUP PEMERIKSAAN */}
               {Object.entries(groupedTests).map(([groupName, groupItems]) => (
                 <tbody
                   key={groupName}
                   className="divide-y divide-gray-100/70 border-b-4 border-gray-100"
                 >
-                  {/* BARIS SEPARATOR GRUP */}
                   <tr className="bg-gray-50/80">
                     <td
                       colSpan="6"
@@ -238,37 +312,47 @@ export default function ResultInputModal({
                     </td>
                   </tr>
 
-                  {/* BARIS ITEM PARAMETER */}
                   {groupItems.map((test) => {
-                    const refValue = test.nilai_rujukan || test.range_normal;
-                    const isQualMode = isQualitative(refValue);
-                    const status = analyzeResult(test.nilai, refValue);
-
+                    const config = parseRefConfig(
+                      test.nilai_rujukan || test.range_normal,
+                    );
+                    const gender = test.jenis_kelamin || "L";
+                    const displayRef = getDisplayRefRange(config, gender);
+                    const status = smartAnalyzeResult(
+                      test.nilai,
+                      config,
+                      gender,
+                    );
                     const isAbnormal = status !== "normal" && test.nilai;
-                    const inputClass = `w-full border rounded-lg px-3 py-2 outline-none transition-all ${
+
+                    const inputClass = `w-full border rounded-lg px-3 py-2 outline-none transition-all font-medium ${
                       isAbnormal
-                        ? "border-red-400 bg-red-50 text-red-700 font-bold focus:ring-2 focus:ring-red-500 focus:border-red-500 shadow-sm"
-                        : "border-gray-300 bg-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+                        ? "border-red-400 bg-red-50 text-red-700 focus:ring-2 focus:ring-red-500 shadow-sm"
+                        : "border-gray-300 bg-white focus:ring-2 focus:ring-cyan-500"
                     }`;
 
                     return (
                       <tr
                         key={test.id}
-                        className={`hover:bg-cyan-50/30 transition-colors ${
-                          isAbnormal ? "bg-red-50/20" : ""
-                        }`}
+                        className={`hover:bg-cyan-50/30 transition-colors ${isAbnormal ? "bg-red-50/20" : ""}`}
                       >
                         <td className="py-3 pl-8 font-semibold text-gray-700">
                           {test.parameter_name}
+                          {config.beda_gender && (
+                            <span className="block text-[10px] text-gray-400 mt-0.5">
+                              *Nilai rujukan{" "}
+                              {gender === "L" ? "Pria" : "Wanita"}
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 text-gray-500 text-[10px] text-center uppercase tracking-wider">
                           {test.metode || "-"}
                         </td>
                         <td className="py-3 text-gray-600 text-xs font-medium">
-                          {refValue || "-"}
+                          {displayRef}
                         </td>
-                        <td className="py-3 relative">
-                          {isQualMode ? (
+                        <td className="py-3 relative px-4">
+                          {config.jenis === "kualitatif" ? (
                             <select
                               className={inputClass}
                               value={test.nilai || ""}
@@ -276,29 +360,32 @@ export default function ResultInputModal({
                                 handleInputChange(test.id, e.target.value)
                               }
                               disabled={saving}
-                              required
                             >
                               <option value="" disabled>
-                                -- Pilih --
+                                -- Pilih Hasil --
                               </option>
-                              {getQualitativeOptions(refValue).map((opt) => (
-                                <option key={opt} value={opt}>
-                                  {opt}
+                              {config.kualitatif.opsi.split(",").map((opt) => (
+                                <option key={opt.trim()} value={opt.trim()}>
+                                  {opt.trim()}
                                 </option>
                               ))}
                             </select>
                           ) : (
                             <div className="relative">
                               <input
-                                type="text"
+                                type={
+                                  config.jenis === "kuantitatif"
+                                    ? "number"
+                                    : "text"
+                                }
+                                step="any"
                                 className={`${inputClass} pr-8`}
                                 value={test.nilai || ""}
                                 onChange={(e) =>
                                   handleInputChange(test.id, e.target.value)
                                 }
-                                placeholder="Input angka..."
+                                placeholder="Input hasil..."
                                 disabled={saving}
-                                required
                               />
                               {status === "high" && (
                                 <ArrowUp
@@ -312,19 +399,22 @@ export default function ResultInputModal({
                                   className="absolute right-3 top-1/2 -translate-y-1/2 text-red-600 font-bold"
                                 />
                               )}
+                              {status === "abnormal" &&
+                                config.jenis !== "kuantitatif" && (
+                                  <AlertCircle
+                                    size={16}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-red-600"
+                                  />
+                                )}
                             </div>
                           )}
                         </td>
-                        <td className="py-3 text-gray-500 text-center text-xs font-mono font-medium">
+                        <td className="py-3 text-gray-500 text-center text-xs font-mono">
                           {test.satuan || "-"}
                         </td>
                         <td className="py-3 text-center pr-6">
                           <span
-                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                              test.status === "completed"
-                                ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                                : "bg-gray-100 text-gray-500 border border-gray-200"
-                            }`}
+                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${test.status === "completed" ? "bg-emerald-100 text-emerald-700 border border-emerald-200" : "bg-gray-100 text-gray-500 border border-gray-200"}`}
                           >
                             {test.status === "completed" ? "Selesai" : "Draft"}
                           </span>
@@ -338,7 +428,6 @@ export default function ResultInputModal({
           )}
         </div>
 
-        {/* Footer Modal */}
         <div className="p-5 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
           <div className="text-xs text-gray-600 font-medium flex items-center gap-1.5 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
             <AlertCircle size={14} className="text-red-500" />

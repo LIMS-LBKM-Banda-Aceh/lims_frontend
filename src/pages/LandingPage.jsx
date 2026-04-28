@@ -191,12 +191,14 @@ export default function LandingPage() {
               desc="Mendaftarkan sampel dengan mudah dan efisien dengan formulir digital yang terintegrasi dengan database."
               delay={0.1}
             />
-            <ServiceCard
-              icon={Search}
-              title="Tracking Sampel"
-              desc="Pantau status pengerjaan sampel secara realtime. Rincian detail proses dari penerimaan hingga hasil keluar."
-              delay={0.2}
-            />
+            <Link to="/cek-status">
+              <ServiceCard
+                icon={Search}
+                title="Tracking Sampel"
+                desc="Pantau status pengerjaan sampel secara realtime. Rincian detail proses dari penerimaan hingga hasil keluar."
+                delay={0.2}
+              />
+            </Link>
             <ServiceCard
               icon={FlaskConical}
               title="Hasil Pemeriksaan"
