@@ -24,6 +24,8 @@ import {
   CheckCircle2,
   FileText,
   CloudUpload,
+  UploadCloud,
+  DownloadCloud,
   X, // <-- Icon tambahan untuk tutup modal
 } from "lucide-react";
 
@@ -35,6 +37,7 @@ import { saveAs } from "file-saver";
 import { toast } from "react-toastify";
 import LHUPrintTemplate from "../components/LHUPrintTemplate";
 import ResultInputModal from "../components/ResultInputModal";
+import UploadLhuModal from "../components/UploadLhuModal";
 import { useAuth } from "../context/AuthContext";
 
 export default function DataManagement({ onRefreshStats }) {
@@ -61,6 +64,10 @@ export default function DataManagement({ onRefreshStats }) {
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
   });
+
+  // --- NEW STATE FOR UPLOAD LHU MODAL ---
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [selectedUploadData, setSelectedUploadData] = useState(null);
 
   const months = [
     { value: 1, label: "Januari" },
@@ -655,6 +662,34 @@ export default function DataManagement({ onRefreshStats }) {
     );
   };
 
+  const handleDeleteCustomLHU = async (id) => {
+    if (
+      globalThis.confirm(
+        "Hapus dokumen Custom LHU ini? Sistem akan kembali menggunakan LHU Auto-generate.",
+      )
+    ) {
+      const toastId = toast.loading("Menghapus dokumen...");
+      try {
+        await api.delete(`/registrations/${id}/custom-lhu`);
+        toast.update(toastId, {
+          render: "Dokumen Custom LHU berhasil dihapus",
+          type: "success",
+          isLoading: false,
+          autoClose: 3000,
+        });
+        fetchData(); // Refresh tabel
+      } catch (error) {
+        console.error("Error deleting custom LHU:", error);
+        toast.update(toastId, {
+          render: error.response?.data?.message || "Gagal menghapus dokumen",
+          type: "error",
+          isLoading: false,
+          autoClose: 4000,
+        });
+      }
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in p-2 md:p-0">
       {/* --- HEADER SECTION --- */}
@@ -859,15 +894,64 @@ export default function DataManagement({ onRefreshStats }) {
 
                     {/* Kolom 4: Aksi */}
                     <td className="px-6 py-4 text-center">
-                      <div className="flex justify-center gap-2">
+                      <div className="flex justify-center gap-2 items-center">
                         {item.status === "selesai" ? (
-                          <button
-                            onClick={() => handlePrintLHU(item.id)}
-                            className="bg-purple-600 text-white px-3 py-2 rounded-xl text-xs font-bold hover:bg-purple-700 flex items-center gap-1.5 shadow-md shadow-purple-100 active:scale-95 transition-all"
-                            title="Cetak LHU"
-                          >
-                            <Printer size={16} /> Cetak
-                          </button>
+                          <>
+                            {/* Tombol Print (Auto-generate LHU bawaan sistem) */}
+                            <button
+                              onClick={() => handlePrintLHU(item.id)}
+                              className="bg-purple-600 text-white px-2.5 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700 flex items-center gap-1.5 shadow-md shadow-purple-100 transition-all"
+                              title="Cetak Auto Template LHU"
+                            >
+                              <Printer size={14} /> Cetak
+                            </button>
+
+                            {/* Logika Custom LHU Action Group */}
+                            {item.link_hasil &&
+                            item.link_hasil.includes("custom_lhu_") ? (
+                              <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 p-0.5 rounded-lg ml-1">
+                                <a
+                                  href={item.link_hasil}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-md transition-all"
+                                  title="Lihat Custom LHU"
+                                >
+                                  <DownloadCloud size={14} />
+                                </a>
+                                <div className="w-px h-4 bg-emerald-200"></div>
+                                <button
+                                  onClick={() => {
+                                    setSelectedUploadData(item);
+                                    setUploadModalOpen(true);
+                                  }}
+                                  className="p-1.5 text-blue-600 hover:bg-blue-600 hover:text-white rounded-md transition-all"
+                                  title="Ganti Dokumen (Upload Ulang)"
+                                >
+                                  <UploadCloud size={14} />
+                                </button>
+                                <div className="w-px h-4 bg-emerald-200"></div>
+                                <button
+                                  onClick={() => handleDeleteCustomLHU(item.id)}
+                                  className="p-1.5 text-red-600 hover:bg-red-600 hover:text-white rounded-md transition-all"
+                                  title="Hapus Dokumen"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setSelectedUploadData(item);
+                                  setUploadModalOpen(true);
+                                }}
+                                className="bg-cyan-600 text-white px-2.5 py-1.5 ml-1 rounded-lg text-xs font-bold hover:bg-cyan-700 flex items-center gap-1.5 shadow-md shadow-cyan-100 transition-all"
+                                title="Upload LHU Dokumen Custom"
+                              >
+                                <UploadCloud size={14} /> Upload
+                              </button>
+                            )}
+                          </>
                         ) : (
                           <span className="text-gray-400 italic text-[10px] bg-gray-50 px-2 py-1.5 rounded-lg border border-gray-100">
                             {item.status === "selesai_uji"
@@ -876,8 +960,10 @@ export default function DataManagement({ onRefreshStats }) {
                           </span>
                         )}
 
+                        {/* Tombol Edit & Hapus (Untuk Admin/Manajemen) */}
                         {(user?.role === "manajemen" ||
                           user?.role === "admin") && (
+                          // ... Biarkan bagian Edit/Delete ini tetap sama seperti kode Anda sebelumnya ...
                           <div className="flex gap-1 ml-2 pl-2 border-l border-gray-200">
                             <button
                               onClick={() =>
@@ -885,14 +971,14 @@ export default function DataManagement({ onRefreshStats }) {
                                   state: { restrictItems: true },
                                 })
                               }
-                              className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600 transition-colors"
+                              className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600 transition-colors"
                               title="Edit Data Pasien"
                             >
                               <Pencil size={14} />
                             </button>
                             <button
                               onClick={() => handleDelete(item.id)}
-                              className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 transition-colors"
+                              className="p-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 transition-colors"
                               title="Hapus Data"
                             >
                               <Trash2 size={14} />
@@ -1134,6 +1220,23 @@ export default function DataManagement({ onRefreshStats }) {
             </div>
           </div>
         </div>
+      )}
+      {/* --- MODAL UPLOAD CUSTOM LHU --- */}
+      {uploadModalOpen && selectedUploadData && (
+        <UploadLhuModal
+          registrationId={selectedUploadData.id}
+          noReg={selectedUploadData.no_reg}
+          onClose={() => {
+            setUploadModalOpen(false);
+            setSelectedUploadData(null);
+          }}
+          onSuccess={(newLink) => {
+            setUploadModalOpen(false);
+            setSelectedUploadData(null);
+            fetchData(); // Refresh tabel setelah upload sukses
+            if (onRefreshStats) onRefreshStats();
+          }}
+        />
       )}
     </div>
   );
