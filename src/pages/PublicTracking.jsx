@@ -330,7 +330,7 @@ export default function PublicTracking() {
               className="bg-white rounded-[2.5rem] shadow-2xl border border-white overflow-hidden shadow-slate-200"
             >
               {/* Header Card */}
-              <div className="p-8 bg-gradient-to-br from-slate-50 to-white border-b border-slate-100">
+              <div className="p-8 bg-linear-to-br from-slate-50 to-white border-b border-slate-100">
                 <div className="flex items-center gap-5">
                   <div className="w-14 h-14 rounded-2xl bg-cyan-100 flex items-center justify-center text-cyan-600 shadow-inner">
                     <User size={28} />
@@ -371,8 +371,10 @@ export default function PublicTracking() {
               <AnimatePresence>
                 {result.status === "selesai" && result.link_hasil && (
                   <motion.div
+                    key="download-btn" // 👈 INI WAJIB ADA
                     initial={{ y: 50, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 50, opacity: 0 }} // Tambahkan exit biar animasinya smooth saat datanya berganti
                     className="p-6 bg-emerald-50 border-t border-emerald-100"
                   >
                     <button
@@ -385,35 +387,31 @@ export default function PublicTracking() {
                 )}
               </AnimatePresence>
             </motion.div>
-          ) : (
-            hasSearched &&
-            !loading && (
-              <motion.div
-                key="error"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white p-10 rounded-[2.5rem] border border-slate-200 text-center shadow-2xl shadow-red-100"
-              >
-                <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <AlertCircle size={32} />
-                </div>
-                <h3 className="font-black text-slate-800 text-lg">
-                  Data Tidak Ditemukan
-                </h3>
-                <p className="text-sm text-slate-500 mt-2 font-medium leading-relaxed">
-                  No. Registrasi{" "}
-                  <span className="font-bold text-slate-800">
-                    "{form.no_reg}"
-                  </span>{" "}
-                  tidak cocok dengan NIK yang dimasukkan.
-                </p>
-              </motion.div>
-            )
-          )}
+          ) : hasSearched && !loading ? ( // 👈 Ubah jadi ternary operator
+            <motion.div
+              key="error"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9 }} // Tambahkan exit
+              className="bg-white p-10 rounded-[2.5rem] border border-slate-200 text-center shadow-2xl shadow-red-100"
+            >
+              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertCircle size={32} />
+              </div>
+              <h3 className="font-black text-slate-800 text-lg">
+                Data Tidak Ditemukan
+              </h3>
+              <p className="text-sm text-slate-500 mt-2 font-medium leading-relaxed">
+                No. Registrasi{" "}
+                <span className="font-bold text-slate-800">
+                  "{form.no_reg}"
+                </span>{" "}
+                tidak cocok dengan NIK yang dimasukkan.
+              </p>
+            </motion.div>
+          ) : null}
         </AnimatePresence>
       </div>
-
-  
     </div>
   );
 }
