@@ -536,6 +536,18 @@ export default function SamplerQueue({ onRefreshStats }) {
                                 WIB
                               </span>
                             </span>
+                            {/* Tambahan: Menampilkan Hari, Tanggal, Bulan, dan Tahun */}
+                            <span className="text-[10px] text-gray-400 capitalize mt-0.5">
+                              {new Date(item.created_at).toLocaleDateString(
+                                "id-ID",
+                                {
+                                  weekday: "short",
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                },
+                              )}
+                            </span>
                           </div>
                         </div>
 

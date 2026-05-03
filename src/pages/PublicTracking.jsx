@@ -162,10 +162,9 @@ export default function PublicTracking() {
     setHasSearched(true);
 
     try {
-      const res = await axios.post(
-        "http://localhost:3000/api/public/track",
-        form,
-      );
+      const API_URL = import.meta.env.VITE_API_BASE_URL || "";
+      const res = await axios.post(`${API_URL}/public/track`, form);
+
       if (res.data?.success && res.data?.data) {
         setResult(res.data.data);
         toast.success("Data Sinkron");

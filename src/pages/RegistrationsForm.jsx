@@ -229,6 +229,8 @@ export default function RegistrationForm({ onSuccess }) {
   const [totalBiaya, setTotalBiaya] = useState(0);
 
   const [form, setForm] = useState({
+    dokter: "",
+    no_rekam_medik: "",
     nama_pasien: "",
     nik: "",
     no_sampel_lab: "",
@@ -323,9 +325,10 @@ export default function RegistrationForm({ onSuccess }) {
     }
   }, [baseSequence, requiredInstallations]);
 
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
-
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
   // Auto Calculate Age
   useEffect(() => {
     if (form.tgl_lahir) {
@@ -490,6 +493,8 @@ export default function RegistrationForm({ onSuccess }) {
 
       setForm({
         ...form,
+        dokter: "", 
+        no_rekam_medik: "",
         nama_pasien: "",
         nik: "",
         no_sampel_lab: "",
@@ -535,9 +540,7 @@ export default function RegistrationForm({ onSuccess }) {
               <span key={pIndex}>
                 {pIndex === seqIndex ? (
                   // Style angka urutan disamakan dengan preview (cyan-600 & ditebalkan)
-                  <span className="text-black font-black mx-0.5">
-                    {part}
-                  </span>
+                  <span className="text-black font-black mx-0.5">{part}</span>
                 ) : (
                   <span className="text-yellow-900">{part}</span>
                 )}
@@ -645,6 +648,20 @@ export default function RegistrationForm({ onSuccess }) {
                 </div>
               )}
             </div>
+            <FormInput
+              label="Dokter"
+              name="dokter"
+              value={form.dokter}
+              onChange={handleChange}
+              placeholder="Nama Dokter (opsional)"
+            />
+            <FormInput
+              label="No. Rekam Medik (RM)"
+              name="no_rekam_medik"
+              value={form.no_rekam_medik}
+              onChange={handleChange}
+              placeholder="Contoh: RM-12345"
+            />
             <FormInput
               label="Nama Lengkap"
               name="nama_pasien"
@@ -784,7 +801,7 @@ export default function RegistrationForm({ onSuccess }) {
                     Riwayat Nomor Terakhir Database:
                   </p>
                   <p className="text-xs font-mono font-medium wrap-break-word leading-tight items-center flex flex-wrap">
-                    {renderHighlightedSequence(lastSampleString)} 
+                    {renderHighlightedSequence(lastSampleString)}
                   </p>
                 </div>
 

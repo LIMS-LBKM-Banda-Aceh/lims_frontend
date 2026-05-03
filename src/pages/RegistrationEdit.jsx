@@ -253,6 +253,8 @@ export default function RegistrationEdit() {
 
   // --- STATE FORM UTAMA ---
   const [form, setForm] = useState({
+    dokter: "",
+    no_rekam_medik: "",
     nama_pasien: "",
     nik: "",
     tgl_lahir: "",
@@ -318,6 +320,7 @@ export default function RegistrationEdit() {
 
         setForm({
           ...data,
+          dokter: data.dokter || "",
           tgl_lahir: formatDate(data.tgl_lahir),
           tgl_daftar: formatDate(data.tgl_daftar),
           waktu_daftar: formatTime(data.waktu_daftar),
@@ -460,8 +463,10 @@ export default function RegistrationEdit() {
     return () => clearTimeout(timeoutId);
   }, [form.no_sampel_lab, id]);
 
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleAsalSampelChange = (e) => {
     const val = e.target.value;
@@ -705,6 +710,20 @@ export default function RegistrationEdit() {
                     Identitas Pasien
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormInput
+                      label="Dokter"
+                      name="dokter"
+                      value={form.dokter}
+                      onChange={handleChange}
+                      placeholder="Nama Dokter (opsional)"
+                    />
+                    <FormInput
+                      label="No. Rekam Medik (RM)"
+                      name="no_rekam_medik"
+                      value={form.no_rekam_medik}
+                      onChange={handleChange}
+                      placeholder="Contoh: RM-12345"
+                    />
                     <FormInput
                       label="Nama Lengkap"
                       name="nama_pasien"

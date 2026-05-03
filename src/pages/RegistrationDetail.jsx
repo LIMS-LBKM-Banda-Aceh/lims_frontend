@@ -441,7 +441,7 @@ export default function RegistrationDetail({ data, onBack }) {
 
       <div id="print-section" className="print-content-padding">
         {/* --- KOP SURAT (PRINT VIEW) --- */}
-        <div className="hidden print:flex justify-between items-center border-b-2 border-black pb-4 mb-6">
+        <div className="hidden print:flex justify-between items-center pb-4 mb-4">
           <img
             src={kopMailImg}
             alt="Logo"
@@ -454,7 +454,7 @@ export default function RegistrationDetail({ data, onBack }) {
 
         {/* JUDUL PRINT DENGAN NOMOR INVOICE */}
         <div className="hidden print:block text-center mb-6">
-          <h3 className="text-lg font-extrabold text-black underline-offset-4 uppercase">
+          <h3 className="text-lg font-extrabold text-black border-t-2 border-black underline-offset-4 uppercase">
             INVOICE LAYANAN PNBP
             <br />
             BALAI LABORATORIUM KESEHATAN MASYARAKAT BANDA ACEH
@@ -482,8 +482,8 @@ export default function RegistrationDetail({ data, onBack }) {
                       className="text-white print:text-black"
                     />
                     <span className="text-sm font-medium opacity-90 print:opacity-100">
-                      Lab ID:{" "}
-                      <span className="font-bold text-white print:text-black">
+                      No. Sampel:{" "}
+                      <span className="font-bold text-white print:text-orange-600">
                         {data.no_sampel_lab}
                       </span>
                     </span>
@@ -510,36 +510,49 @@ export default function RegistrationDetail({ data, onBack }) {
                   </h3>
                 </div>
                 <div className="print:text-xs space-y-2">
+                  {/* TAMBAHAN RM DI ATAS NAMA PASIEN */}
+                  {/* <div className="grid grid-cols-3">
+                    <span className="text-gray-500">Dokter</span>
+                    <span className="col-span-2 font-bold">
+                      {data.dokter || "-"}
+                    </span>
+                  </div> */}
+                  {/* <div className="grid grid-cols-3">
+                    <span className="text-gray-500">No. Rekam Medik</span>
+                    <span className="col-span-2 font-bold font-mono">
+                      {data.no_rekam_medik || "-"}
+                    </span>
+                  </div> */}
                   <div className="grid grid-cols-3">
                     <span className="text-gray-500">Nama</span>
                     <span className="col-span-2 font-bold">
-                      {data.nama_pasien}
+                      : {data.nama_pasien}
                     </span>
                   </div>
                   <div className="grid grid-cols-3">
                     <span className="text-gray-500">NIK</span>
-                    <span className="col-span-2">{data.nik || "-"}</span>
+                    <span className="col-span-2">: {data.nik || "-"}</span>
                   </div>
                   <div className="grid grid-cols-3">
                     <span className="text-gray-500">Umur / JK</span>
                     <span className="col-span-2">
-                      {data.umur} Tahun /{" "}
-                      {data.jenis_kelamin === "L" ? "Laki-laki" : "Perempuan"}
+                      : {data.umur} Tahun /{" "}
+                      : {data.jenis_kelamin === "L" ? "Laki-laki" : "Perempuan"}
                     </span>
                   </div>
                   <div className="grid grid-cols-3">
                     <span className="text-gray-500">Tgl Lahir</span>
                     <span className="col-span-2">
-                      {formatDate(data.tgl_lahir)}
+                      : {formatDate(data.tgl_lahir)}
                     </span>
                   </div>
                   <div className="grid grid-cols-3">
                     <span className="text-gray-500">Alamat</span>
-                    <span className="col-span-2">{data.alamat || "-"}</span>
+                    <span className="col-span-2">: {data.alamat || "-"}</span>
                   </div>
                   <div className="grid grid-cols-3">
                     <span className="text-gray-500">Kontak</span>
-                    <span className="col-span-2">{data.no_kontak || "-"}</span>
+                    <span className="col-span-2">: {data.no_kontak || "-"}</span>
                   </div>
                 </div>
               </div>
@@ -556,36 +569,52 @@ export default function RegistrationDetail({ data, onBack }) {
                   <div className="grid grid-cols-3">
                     <span className="text-gray-500">Asal Sampel</span>
                     <span className="col-span-2 font-medium">
-                      {data.asal_sampel}
+                      : {data.asal_sampel}
                     </span>
                   </div>
                   <div className="grid grid-cols-3">
                     <span className="text-gray-500">Instansi</span>
                     <span className="col-span-2 font-medium">
-                      {data.pengirim_instansi || "-"}
+                      : {data.pengirim_instansi || "-"}
                     </span>
                   </div>
                   <div className="grid grid-cols-3">
                     <span className="text-gray-500">Pembayaran</span>
                     <span className="col-span-2 font-medium">
-                      {data.status_pembayaran || "berbayar"}
+                      : {data.status_pembayaran || "berbayar"}
                     </span>
                   </div>
                   <div className="grid grid-cols-3">
                     <span className="text-gray-500">Waktu Daftar</span>
                     <span className="col-span-2">
-                      {formatDate(data.tgl_daftar)} —{" "}
+                      : {formatDate(data.tgl_daftar)} -{" "}
                       {formatTime(data.waktu_daftar)} WIB
                     </span>
                   </div>
-                  {data.catatan_tambahan && (
-                    <div className="grid grid-cols-3">
-                      <span className="text-gray-500 italic">Catatan</span>
-                      <span className="col-span-2 text-orange-600 font-medium italic">
-                        {data.catatan_tambahan}
-                      </span>
-                    </div>
-                  )}
+                  {/* TAMBAHAN WAKTU SAMPLING DAN TERBIT */}
+                  {/* <div className="grid grid-cols-3">
+                    <span className="text-gray-500">Waktu Sampling</span>
+                    <span className="col-span-2">
+                      : {data.waktu_pengambilan
+                        ? formatTime(data.waktu_pengambilan) + " WIB"
+                        : "Menunggu sampling"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3">
+                    <span className="text-gray-500">Terbit Hasil</span>
+                    <span className="col-span-2 font-semibold text-emerald-600">
+                      {data.validated_at
+                        ? formatTime(data.validated_at) + " WIB"
+                        : "Belum terbit"}
+                    </span>
+                  </div> */}
+
+                  <div className="grid grid-cols-3">
+                    <span className="text-gray-500">Catatan</span>
+                    <span className="col-span-2 0 font-medium ">
+                      : {data.catatan_tambahan || "-"} 
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -602,7 +631,7 @@ export default function RegistrationDetail({ data, onBack }) {
             </div>
 
             {/* Footer Tanda Tangan */}
-            <div className="hidden print:flex mt-8 pt-8 justify-end text-center text-xs text-black break-inside-avoid items-end">
+            <div className="hidden print:flex mt-4 pt-4 justify-end text-center text-xs text-black break-inside-avoid items-end">
               {/* SISI KANAN: PETUGAS */}
               <div className="flex flex-col items-center justify-center text-center w-64">
                 <p>Aceh Besar, {formatDate(data.tgl_daftar)}</p>

@@ -690,6 +690,34 @@ export default function DataManagement({ onRefreshStats }) {
     }
   };
 
+  const getSafeLhuUrl = (rawLink) => {
+    if (!rawLink) return "#";
+
+    // Regex ini secara spesifik mengekstrak HANYA nama file PDF/DOC/XLS
+    // Mengabaikan duplikasi "http://localhost..." yang menumpuk di database
+    const match = rawLink.match(/(custom_lhu_[a-zA-Z0-9-]+\.[a-zA-Z0-9]+)/i);
+
+    if (match && match[0]) {
+      const fileName = match[0];
+
+      // Ambil base URL server dari environment (.env)
+      const apiBase =
+        import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+
+      // Hapus '/api' di ujungnya untuk mendapatkan root domain server
+      const serverUrl = apiBase.replace(/\/api\/?$/, "");
+
+      // Kembalikan clean absolute path yang dijamin valid
+      return `${serverUrl}/public/results/${fileName}`;
+
+      // Opsi Alternatif: Jika kamu ingin memaksa file agar otomatis "Terdownload"
+      // (bukan terbuka Preview PDF di tab baru), manfaatkan rute /download dari server.js:
+      // return `${serverUrl}/download/${fileName}`;
+    }
+
+    return rawLink;
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in p-2 md:p-0">
       {/* --- HEADER SECTION --- */}
@@ -911,7 +939,7 @@ export default function DataManagement({ onRefreshStats }) {
                             item.link_hasil.includes("custom_lhu_") ? (
                               <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 p-0.5 rounded-lg ml-1">
                                 <a
-                                  href={item.link_hasil}
+                                  href={getSafeLhuUrl(item.link_hasil)}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="p-1.5 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-md transition-all"
