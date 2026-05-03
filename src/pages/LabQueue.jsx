@@ -555,15 +555,25 @@ export default function LabQueue({ onRefreshStats }) {
                       <div className="flex flex-col gap-0.5 mt-0.5">
                         <div className="flex items-center gap-1 font-bold text-gray-700">
                           <Clock size={14} className="text-cyan-600" />{" "}
-                          {item.waktu_daftar?.slice(0, 5) || "00:00"} WIB
+                          {new Date(item.created_at).toLocaleTimeString(
+                            "id-ID",
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            },
+                          )}{" "}
+                          <span className="text-xs font-normal text-gray-500">
+                            WIB
+                          </span>
                         </div>
-                        <div className="text-[10px] text-gray-400 capitalize">
-                          {new Date(item.tgl_daftar).toLocaleDateString(
+                        <div className="text-[10px] text-gray-400 capitalize mt-0.5">
+                          {new Date(item.created_at).toLocaleDateString(
                             "id-ID",
                             {
                               weekday: "short",
                               day: "numeric",
                               month: "short",
+                              year: "numeric",
                             },
                           )}
                         </div>

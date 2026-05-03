@@ -148,10 +148,22 @@ export default function LHUPrintTemplate({ data }) {
     date: data.validated_at || new Date().toISOString(),
   });
 
+  const formatTimeStr = (dateString) => {
+    if (!dateString) return "-";
+    const dateObj = new Date(dateString);
+    if (!isNaN(dateObj.getTime())) {
+      return dateObj.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+    return "-";
+  };
+
   return (
     <div className="font-sans text-black max-w-[21cm] mx-auto print:w-full print:max-w-none">
       {/* HEADER KOP SURAT */}
-      <div className="flex justify-between items-center mb-6 border-b-2 border-black pb-4">
+      <div className="flex justify-between items-center mb-6 pb-4">
         <img
           src={kopMailImg}
           alt="Logo"
@@ -171,17 +183,29 @@ export default function LHUPrintTemplate({ data }) {
         <table>
           <tbody>
             <tr>
+              <td className="w-32 py-1">Dokter</td>
+              <td>
+                : {data.dokter || "-"}
+              </td>
+            </tr>
+            <tr>
+              <td className="w-32 py-1">No. Rekam Medik</td>
+              <td>
+                : {data.no_rekam_medik || "-"}
+              </td>
+            </tr>
+            <tr>
               <td className="py-1">Nama Pasien</td>
               <td>
                 : <b>{data.nama_pasien}</b>
               </td>
             </tr>
             <tr>
-              <td className="w-32 py-1">Tanggal Lahir</td>
+              <td className="py-1">Tanggal Lahir</td>
               <td>: {formatDate(data.tgl_lahir)}</td>
             </tr>
             <tr>
-              <td className="w-32 py-1">NIK</td>
+              <td className="py-1">NIK</td>
               <td>: {data.nik || "-"}</td>
             </tr>
             <tr>
@@ -202,25 +226,33 @@ export default function LHUPrintTemplate({ data }) {
               <td>: {data.no_reg}</td>
             </tr>
             <tr>
-              <td className="py-1">Tanggal daftar</td>
-              <td>: {formatDate(data.tgl_daftar)}</td>
-            </tr>
-            <tr>
-              <td className="py-1">Nomor Spesimen/Sampel</td>
+              <td className="py-1">Nomor Sampel</td>
               <td>: {data.no_sampel_lab}</td>
             </tr>
             <tr>
-              <td className="py-1">Waktu Daftar</td>
-              <td>: {formatTime(data.waktu_daftar)} WIB</td>
-            </tr>
-            <tr>
-              <td className="py-1">Validator</td>
-              <td>: {data.validator || "Belum divalidasi"}</td>
-            </tr>
-            <tr>
-              <td className="py-1">Tanggal Validasi</td>
+              <td className="py-1">Tgl/Waktu Daftar</td>
               <td>
-                : {data.validated_at ? formatDate(data.validated_at) : "-"}
+                : {formatDate(data.tgl_daftar)} -{" "}
+                {formatTimeStr(data.waktu_daftar)} WIB
+              </td>
+            </tr>
+            {/* POIN 2 & 3: Waktu Pengambilan Sampel & Jam Terbit Hasil */}
+            <tr>
+              <td className="py-1">Jam Waktu Sampling</td>
+              <td>
+                :{" "}
+                {data.waktu_pengambilan
+                  ? formatTimeStr(data.waktu_pengambilan) + " WIB"
+                  : "-"}
+              </td>
+            </tr>
+            <tr>
+              <td className="py-1">Jam Terbit Hasil</td>
+              <td>
+                :{" "}
+                {data.validated_at
+                  ? formatTimeStr(data.validated_at) + " WIB"
+                  : "Belum terbit"}
               </td>
             </tr>
           </tbody>
@@ -285,7 +317,29 @@ export default function LHUPrintTemplate({ data }) {
       </table>
 
       {/* FOOTER TTD & QR CODE */}
-      <div className="flex justify-end mt-8 break-inside-avoid page-break-inside-avoid">
+      {/* Diubah jadi flex-row, justify-between, */}
+      <div className="flex w-full justify-between break-inside-avoid page-break-inside-avoid">
+        {/* KIRI: INFO VALIDATOR */}
+        <div className="text-sm mb-6">
+          <table>
+            <tbody>
+              <tr>
+                <td className="py-1 pr-4 whitespace-nowrap">Validator</td>
+                <td>: {data.validator || "Belum divalidasi"}</td>
+              </tr>
+              <tr>
+                <td className="py-1 pr-4 whitespace-nowrap">
+                  Tanggal Validasi
+                </td>
+                <td>
+                  : {data.validated_at ? formatDate(data.validated_at) : "-"}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* KANAN: KOTAK TTD */}
         <div className="flex flex-col items-center justify-center text-center w-64">
           <p className="">
             Aceh Besar,{" "}
