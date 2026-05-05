@@ -490,6 +490,9 @@ export default function RegistrationDetail({ data, onBack }) {
                   </div>
                 )}
               </div>
+
+
+              
               <div className="bg-white/20 px-4 py-1.5 rounded-full border border-white/30 print:border-black print:text-black">
                 <span className="font-bold text-sm uppercase">
                   {data.status}
@@ -537,7 +540,7 @@ export default function RegistrationDetail({ data, onBack }) {
                     <span className="text-gray-500">Umur / JK</span>
                     <span className="col-span-2">
                       : {data.umur} Tahun /{" "}
-                      : {data.jenis_kelamin === "L" ? "Laki-laki" : "Perempuan"}
+                      {data.jenis_kelamin === "L" ? "Laki-laki" : "Perempuan"}
                     </span>
                   </div>
                   <div className="grid grid-cols-3">
