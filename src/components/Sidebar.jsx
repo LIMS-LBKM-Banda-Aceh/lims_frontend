@@ -20,7 +20,7 @@ import {
   Loader2, // Tambahan icon
   X, // Tambahan icon
   Save, // Tambahan icon
-  Settings, // Tambahan icon  
+  Settings, // Tambahan icon
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import SystemSettings from "./SystemSettings";
@@ -147,7 +147,7 @@ export default function Sidebar({
     );
   }
 
-  if (user?.role === "lab") {
+  if (user?.role === "lab" || user?.role === "validator") {
     menuItems.push({
       id: "master",
       label: "Master Data",
