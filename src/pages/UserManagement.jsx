@@ -104,13 +104,13 @@ export default function UserManagement() {
 
     try {
       if (isEditing) {
-        // FIX: Tambahkan instalasi_id ke dalam payload update.
-        // Jika bukan lab, paksa menjadi null agar bersih.
         const payload = {
           username: formData.username,
           fullname: formData.fullname,
           role: formData.role,
-          instalasi_id: formData.role === "lab" ? formData.instalasi_id : null,
+          instalasi_id: ["lab"].includes(formData.role)
+            ? formData.instalasi_id
+            : null,
         };
         if (formData.password) payload.password = formData.password;
 
@@ -156,9 +156,7 @@ export default function UserManagement() {
     };
     return (
       <span
-        className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${
-          styles[role] || styles.input
-        }`}
+        className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${styles[role] || styles.input}`}
       >
         {role}
       </span>
@@ -348,7 +346,9 @@ export default function UserManagement() {
                   <option value="input">Input (Pendaftaran)</option>
                   <option value="kasir">Kasir (Pendaftaran)</option>
                   <option value="sampler">Sampler (Pengambil Sampel)</option>
-                  <option value="lab">Lab (Petugas Lab / Analis)</option>
+                  <option value="lab">
+                    Lab (Petugas Lab / Analis & Verifikator)
+                  </option>
                   <option value="validator">
                     Validator (Dokter / Penanggung Jawab)
                   </option>
@@ -359,7 +359,7 @@ export default function UserManagement() {
                 </select>
               </div>
               {/* ------------------------------------------------------------------- */}
-              {formData.role === "lab" && (
+              {["lab", "verifikator"].includes(formData.role) && (
                 <div className="space-y-1.5 animate-fade-in">
                   <label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                     <Building2 size={16} className="text-cyan-600" /> Penempatan

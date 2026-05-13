@@ -14,6 +14,7 @@ import {
   PlusCircle,
   Syringe,
   Settings,
+  CheckSquare,
 } from "lucide-react";
 
 // Components
@@ -91,11 +92,18 @@ const DashboardOverview = ({
           subtext="Sedang dianalisis"
         />
         <StatCard
+          title="Verifikasi Lab"
+          value={stats?.menunggu_verifikasi || 0}
+          icon={CheckSquare}
+          color="bg-teal-500"
+          subtext="Menunggu ACC Verifikator"
+        />
+        <StatCard
           title="Selesai Uji"
           value={stats?.selesai_uji || 0}
           icon={FileCheck}
           color="bg-purple-500"
-          subtext="Menunggu validasi"
+          subtext="Menunggu validasi dokter"
         />
         <StatCard
           title="Selesai"
@@ -161,6 +169,7 @@ export default function Dashboard() {
           in_sampling: Number(d.in_sampling || 0),
           diterima_lab: Number(d.diterima_lab || 0),
           proses_lab: Number(d.in_testing || 0),
+          menunggu_verifikasi: Number(d.waiting_verification || 0),
           selesai_uji: Number(d.waiting_validation || 0),
           selesai: Number(d.completed || 0),
         };

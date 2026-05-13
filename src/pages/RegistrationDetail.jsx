@@ -454,7 +454,7 @@ export default function RegistrationDetail({ data, onBack }) {
 
         {/* JUDUL PRINT DENGAN NOMOR INVOICE */}
         <div className="hidden print:block text-center mb-6">
-          <h3 className="text-lg font-extrabold text-black border-t-2 border-black underline-offset-4 uppercase">
+          <h3 className="text-lg font-extrabold text-black underline-offset-4 uppercase">
             INVOICE LAYANAN PNBP
             <br />
             BALAI LABORATORIUM KESEHATAN MASYARAKAT BANDA ACEH

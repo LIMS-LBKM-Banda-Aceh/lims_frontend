@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import api from "../api/axios";
+import { useAuth } from "../context/AuthContext";
 import {
   FileCheck,
   Search,
@@ -186,6 +187,7 @@ export const smartAnalyzeResult = (nilai, config, gender) => {
 // -----------------------------------------------------
 
 export default function ValidationQueue({ onRefreshStats }) {
+  const { user } = useAuth();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -219,10 +221,11 @@ export default function ValidationQueue({ onRefreshStats }) {
     try {
       const res = await api.get("/registrations");
       if (res.data.success) {
-        const waitingValidation = res.data.data.filter(
+        // HANYA AMBIL YANG STATUSNYA SELESAI UJI (Sudah melewati Verifikator Lab, Siap di Validasi Dokter)
+        const validationPool = res.data.data.filter(
           (item) => item.status === "selesai_uji",
         );
-        setData(waitingValidation);
+        setData(validationPool);
       }
     } catch (error) {
       console.error("Error fetching validation data:", error);
@@ -241,17 +244,20 @@ export default function ValidationQueue({ onRefreshStats }) {
   }, [searchTerm, itemsPerPage]);
 
   const processedData = useMemo(() => {
-    let filtered = data.filter(
-      (item) =>
-        (item.nama_pasien || "")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()) ||
-        (item.no_reg || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.no_sampel_lab || "")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()),
-    );
+    let filtered = [...data];
 
+    // Filter Search Term
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (item) =>
+          (item.nama_pasien || "").toLowerCase().includes(lower) ||
+          (item.no_reg || "").toLowerCase().includes(lower) ||
+          (item.no_sampel_lab || "").toLowerCase().includes(lower),
+      );
+    }
+
+    // Sorting
     filtered.sort((a, b) => {
       if (sortBy === "newest")
         return (
@@ -264,7 +270,7 @@ export default function ValidationQueue({ onRefreshStats }) {
           new Date(b.updated_at || b.created_at)
         );
       if (sortBy === "name_asc")
-        return a.nama_pasien.localeCompare(b.nama_pasien);
+        return (a.nama_pasien || "").localeCompare(b.nama_pasien || "");
       return 0;
     });
 
@@ -351,20 +357,18 @@ export default function ValidationQueue({ onRefreshStats }) {
 
     setProcessingAcc(true);
     try {
+      // HANYA ACTION FINALISASI VALIDATOR
       const res = await api.put(`/registrations/${previewData.id}/finalize`);
       if (res.data.success) {
-        toast.success("Data berhasil di-ACC. LHU siap dicetak.");
-        setPreviewData(null);
-        fetchData();
-        if (onRefreshStats) onRefreshStats();
+        toast.success("Data berhasil di-ACC Final. LHU siap dicetak.");
       }
+
+      setPreviewData(null);
+      fetchData();
+      if (onRefreshStats) onRefreshStats();
     } catch (error) {
       console.error(error);
-      if (error.response?.data?.message) {
-        toast.error(`Gagal melakukan ACC: ${error.response.data.message}`);
-      } else {
-        toast.error("Gagal melakukan ACC data");
-      }
+      toast.error(error.response?.data?.message || "Gagal memproses data");
     } finally {
       setProcessingAcc(false);
     }
@@ -386,10 +390,11 @@ export default function ValidationQueue({ onRefreshStats }) {
           </div>
           <div>
             <h2 className="text-xl font-bold text-gray-800 tracking-tight">
-              Validasi Hasil
+              Validasi Final Hasil
             </h2>
             <p className="text-gray-500 text-sm font-medium">
-              Tinjau dan validasi hasil uji laboratorium sebelum diterbitkan.
+              Tinjau, perbaiki (jika perlu), dan ACC Final hasil uji
+              laboratorium.
             </p>
           </div>
         </div>
@@ -481,7 +486,7 @@ export default function ValidationQueue({ onRefreshStats }) {
                       <p className="text-gray-400 text-sm mt-1">
                         {searchTerm
                           ? "Tidak ada hasil pencarian."
-                          : "Tidak ada antrian yang perlu divalidasi saat ini."}
+                          : "Tidak ada antrian yang perlu diproses saat ini."}
                       </p>
                     </div>
                   </td>
@@ -528,7 +533,7 @@ export default function ValidationQueue({ onRefreshStats }) {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] uppercase font-bold tracking-wide border bg-yellow-50 text-yellow-700 border-yellow-200">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] uppercase font-bold tracking-wide border bg-blue-50 text-blue-700 border-blue-200">
                         <Clock size={12} /> MENUNGGU VALIDASI
                       </span>
                     </td>
@@ -744,7 +749,6 @@ export default function ValidationQueue({ onRefreshStats }) {
                             </tr>
 
                             {groupItems.map((test) => {
-                              // IMPLEMENTASI SMART PARSER BARU
                               const config = parseRefConfig(
                                 test.nilai_rujukan || test.range_normal,
                               );
@@ -835,7 +839,7 @@ export default function ValidationQueue({ onRefreshStats }) {
                                         </span>
                                         <button
                                           onClick={() => handleStartEdit(test)}
-                                          className="opacity-75 md:opacity-0 group-hover/cell:opacity-100 p-1 text-gray-400 hover:text-emerald-600 transition-opacity absolute right-0"
+                                          className="p-1 text-gray-400 hover:text-emerald-600 transition-colors shrink-0 ml-2"
                                           title="Edit Nilai"
                                         >
                                           <Edit2 size={14} />
@@ -848,7 +852,6 @@ export default function ValidationQueue({ onRefreshStats }) {
                                     {test.satuan || "-"}
                                   </td>
 
-                                  {/* DISPLAY HASIL PARSING DI SINI */}
                                   <td className="px-5 py-3 text-gray-600 text-xs font-medium">
                                     {displayRef}
                                   </td>
@@ -871,7 +874,7 @@ export default function ValidationQueue({ onRefreshStats }) {
               <div className="text-xs text-gray-500 font-medium flex items-center gap-1.5 bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
                 <AlertCircle size={14} className="text-red-500" />
                 Hasil <span className="text-red-600 font-bold">merah</span>{" "}
-                menandakan nilai di luar batas normal.
+                menandakan nilai abnormal.
               </div>
               <div className="flex gap-3">
                 <button
@@ -886,7 +889,7 @@ export default function ValidationQueue({ onRefreshStats }) {
                 <button
                   onClick={handleApprove}
                   disabled={processingAcc || editingTestId !== null}
-                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 text-white font-bold text-sm hover:shadow-lg hover:shadow-emerald-200 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                  className={`px-6 py-2.5 rounded-xl text-white font-bold text-sm transition-all flex items-center gap-2 disabled:opacity-70 bg-gradient-to-r from-blue-600 to-cyan-600 hover:shadow-blue-200`}
                 >
                   {processingAcc ? (
                     <>
@@ -895,7 +898,7 @@ export default function ValidationQueue({ onRefreshStats }) {
                     </>
                   ) : (
                     <>
-                      <CheckCircle2 size={18} /> ACC & Terbitkan LHU
+                      <CheckCircle2 size={18} /> ACC Final & Terbitkan LHU
                     </>
                   )}
                 </button>

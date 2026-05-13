@@ -61,4 +61,41 @@
   .print\:flex {
     display: flex !important;
   }
+
+  .lhu-print {
+    counter-reset: page;
+    padding-bottom: 20mm !important;
+  }
+
+  .lhu-page-number {
+    position: fixed;
+    bottom: 6mm;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 11px;
+    color: #666;
+  }
+
+  .lhu-page-number::after {
+    content: "Halaman " counter(page) " / " counter(pages);
+  }
+
+  /* Hindari tabel pecah jelek */
+  .lhu-print table {
+    page-break-inside: auto;
+  }
+
+  .lhu-print tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .lhu-print thead {
+    display: table-header-group;
+  }
+
+  .lhu-print tfoot {
+    display: table-footer-group;
+  }
 }

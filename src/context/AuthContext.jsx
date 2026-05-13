@@ -83,10 +83,10 @@ export const AuthProvider = ({ children }) => {
     const resetTimer = () => {
       if (timeoutId) clearTimeout(timeoutId);
 
-      // Set waktu idle 5 menit (5 menit * 60 detik * 1000 milidetik = 300.000 ms)
+      // Set waktu idle 30 menit (1800000 ms) untuk auto-logout
       timeoutId = setTimeout(() => {
-        logout("Sesi berakhir karena tidak ada aktivitas selama 5 menit.");
-      }, 300000);
+        logout("Sesi berakhir karena tidak ada aktivitas selama 30 menit.");
+      }, 1800000);
     };
 
     // Jalankan timer pertama kali saat komponen dimount dan user login

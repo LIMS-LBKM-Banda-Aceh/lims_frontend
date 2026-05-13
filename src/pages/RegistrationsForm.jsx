@@ -230,6 +230,7 @@ export default function RegistrationForm({ onSuccess }) {
 
   const [form, setForm] = useState({
     dokter: "",
+    alamat_dokter: "",
     no_rekam_medik: "",
     nama_pasien: "",
     nik: "",
@@ -253,24 +254,32 @@ export default function RegistrationForm({ onSuccess }) {
 
   // --- STATE BARU: Base Sequence untuk Penomoran Master ---
   const [baseSequence, setBaseSequence] = useState("");
-  const [lastSampleString, setLastSampleString] = useState(""); // STATE BARU
+  const [lastSampleString, setLastSampleString] = useState("");
+
+  const [lastRmString, setLastRmString] = useState("-");
+  const [checkingRm, setCheckingRm] = useState(false);
 
   // Fetch Master Data & Inisialisasi Base Sequence HANYA SEKALI saat awal render
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [masterRes, seqRes] = await Promise.all([
+        const [masterRes, seqRes, rmRes] = await Promise.all([
           api.get("/master/pemeriksaan"),
           api.get("/registrations/next-sample-seq"),
+          api.get("/registrations/next-rm"),
         ]);
 
-        if (masterRes.data.success) {
-          setMasterPemeriksaan(masterRes.data.data);
-        }
+        if (masterRes.data.success) setMasterPemeriksaan(masterRes.data.data);
         if (seqRes.data.success) {
           setBaseSequence(seqRes.data.next_seq.toString());
-          // SET STATE STRING TERAKHIR
           setLastSampleString(seqRes.data.last_sample_string);
+        }
+        if (rmRes.data.success) {
+          setForm((prev) => ({
+            ...prev,
+            no_rekam_medik: rmRes.data.data.next_rm,
+          }));
+          setLastRmString(rmRes.data.data.last_rm);
         }
       } catch (err) {
         console.error("Gagal load initial data", err);
@@ -348,11 +357,9 @@ export default function RegistrationForm({ onSuccess }) {
 
   const handleCheckNik = async (nikValue) => {
     if (nikValue?.length !== 16) return;
-
     setCheckingNik(true);
     try {
       const res = await api.get(`/registrations/check-nik/${nikValue}`);
-
       if (res.data.success) {
         if (res.data.found) {
           const patient = res.data.data;
@@ -379,6 +386,7 @@ export default function RegistrationForm({ onSuccess }) {
               jenis_kelamin: patient.jenis_kelamin || "L",
               alamat: patient.alamat || "",
               no_kontak: patient.no_kontak || "",
+              no_rekam_medik: patient.no_rekam_medik || prev.no_rekam_medik,
             };
           });
 
@@ -400,6 +408,53 @@ export default function RegistrationForm({ onSuccess }) {
       console.error("Gagal cek NIK", error);
     } finally {
       setCheckingNik(false);
+    }
+  };
+
+  const handleCheckRm = async (rmValue) => {
+    if (!rmValue) return;
+    setCheckingRm(true);
+    try {
+      const res = await api.get(`/registrations/check-rm/${rmValue}`);
+      if (res.data.success) {
+        if (res.data.found) {
+          const patient = res.data.data;
+          setForm((prev) => {
+            // ... logic kalkulasi umur (sama seperti di NIK)
+            let calculatedAge = "";
+            if (patient.tgl_lahir) {
+              const today = new Date();
+              const birthDate = new Date(patient.tgl_lahir);
+              let age = today.getFullYear() - birthDate.getFullYear();
+              const m = today.getMonth() - birthDate.getMonth();
+              if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate()))
+                age--;
+              calculatedAge = Math.max(age, 0);
+            }
+
+            return {
+              ...prev,
+              nik: patient.nik || "", // <-- Ambil NIK lama
+              nama_pasien: patient.nama_pasien || "",
+              tgl_lahir: patient.tgl_lahir
+                ? new Date(patient.tgl_lahir).toISOString().split("T")[0]
+                : "",
+              umur: calculatedAge,
+              jenis_kelamin: patient.jenis_kelamin || "L",
+              alamat: patient.alamat || "",
+              no_kontak: patient.no_kontak || "",
+            };
+          });
+          toast.success(
+            `Data pasien ditemukan dari No. RM: ${patient.nama_pasien}`,
+          );
+        }
+        // Jika RM tidak ditemukan, anggap RM baru (manual override), jangan clear form
+      }
+    } catch (error) {
+      console.error("Gagal cek RM", error);
+    } finally {
+      setCheckingRm(false);
     }
   };
 
@@ -484,17 +539,24 @@ export default function RegistrationForm({ onSuccess }) {
       toast.success("Registrasi berhasil dibuat!");
       if (onSuccess) onSuccess();
 
-      // Refresh urutan untuk pendaftaran berikutnya
-      const seqRes = await api.get("/registrations/next-sample-seq");
+      const [seqRes, rmRes] = await Promise.all([
+        api.get("/registrations/next-sample-seq"),
+        api.get("/registrations/next-rm"),
+      ]);
+
       if (seqRes.data.success) {
         setBaseSequence(seqRes.data.next_seq.toString());
         setLastSampleString(seqRes.data.last_sample_string);
       }
+      if (rmRes.data.success) {
+        setLastRmString(rmRes.data.data.last_rm);
+      }
 
       setForm({
         ...form,
-        dokter: "", 
-        no_rekam_medik: "",
+        dokter: "",
+        alamat_dokter: "", // <-- clear
+        no_rekam_medik: rmRes.data?.data?.next_rm || "",
         nama_pasien: "",
         nik: "",
         no_sampel_lab: "",
@@ -648,6 +710,24 @@ export default function RegistrationForm({ onSuccess }) {
                 </div>
               )}
             </div>
+            <div className="relative">
+              <FormInput
+                label="No. Rekam Medik (RM)"
+                name="no_rekam_medik"
+                value={form.no_rekam_medik}
+                onChange={handleChange}
+                onBlur={(e) => handleCheckRm(e.target.value)}
+                placeholder="Contoh: 0001"
+              />
+              <span className="absolute left-0 -top-5 text-[10px] text-cyan-600 font-medium">
+                No. RM Terakhir: {lastRmString}
+              </span>
+              {checkingRm && (
+                <div className="absolute top-[34px] right-3">
+                  <Loader2 className="animate-spin text-cyan-600" size={18} />
+                </div>
+              )}
+            </div>
             <FormInput
               label="Dokter"
               name="dokter"
@@ -656,11 +736,11 @@ export default function RegistrationForm({ onSuccess }) {
               placeholder="Nama Dokter (opsional)"
             />
             <FormInput
-              label="No. Rekam Medik (RM)"
-              name="no_rekam_medik"
-              value={form.no_rekam_medik}
+              label="Alamat Dokter"
+              name="alamat_dokter"
+              value={form.alamat_dokter}
               onChange={handleChange}
-              placeholder="Contoh: RM-12345"
+              placeholder="Asal Klinik/RS Dokter (opsional)"
             />
             <FormInput
               label="Nama Lengkap"

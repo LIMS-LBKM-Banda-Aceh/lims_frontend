@@ -35,6 +35,27 @@ export default function Sidebar({
 }) {
   const { user, logout } = useAuth();
 
+  React.useEffect(() => {
+    const fetchMyInstalasi = async () => {
+      if (user?.instalasi_id && ["lab"].includes(user.role)) {
+        try {
+          const res = await api.get("/master/instalasi");
+          if (res.data.success) {
+            const myInst = res.data.data.find(
+              (i) => String(i.id) === String(user.instalasi_id),
+            );
+            if (myInst) setUserInstalasiName(myInst.nama_instalasi);
+          }
+        } catch (error) {
+          console.error("Gagal load nama instalasi", error);
+        }
+      }
+    };
+    fetchMyInstalasi();
+  }, [user]);
+
+  const [userInstalasiName, setUserInstalasiName] = useState("");
+
   // State untuk Modal Profile
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
@@ -52,7 +73,7 @@ export default function Sidebar({
     setProfileForm({
       username: user?.username || "",
       fullname: user?.fullname || "",
-      password: "", // Kosongkan secara default
+      password: "", 
     });
     setIsProfileModalOpen(true);
   };
@@ -88,7 +109,6 @@ export default function Sidebar({
     { id: "overview", label: "Dashboard", icon: LayoutDashboard },
   ];
 
-  // LOGIC MENU BERDASARKAN ROLE (TIDAK ADA YANG DIUBAH)
   if (user?.role === "input" || user?.role === "admin") {
     menuItems.push({
       id: "create",
@@ -103,17 +123,13 @@ export default function Sidebar({
   }
 
   if (user?.role === "lab" || user?.role === "admin") {
-    menuItems.push({
-      id: "lab-queue",
-      label: "Antrian Lab",
-      icon: FlaskConical,
-    });
+    menuItems.push({ id: "lab-queue", label: "Ruang Lab", icon: FlaskConical });
   }
 
   if (user?.role === "validator" || user?.role === "admin") {
     menuItems.push({
       id: "validation",
-      label: "Validasi Hasil",
+      label: "Validasi Dokter",
       icon: FileCheck,
     });
   }
@@ -147,7 +163,7 @@ export default function Sidebar({
     );
   }
 
-  if (user?.role === "lab" || user?.role === "validator") {
+  if (user?.role === "lab" || user?.role === "validator" || user?.role === "manajemen") {
     menuItems.push({
       id: "master",
       label: "Master Data",
@@ -249,12 +265,26 @@ export default function Sidebar({
                 <p className="text-sm font-bold text-gray-800 truncate leading-tight group-hover:text-cyan-600 transition-colors">
                   {user?.fullname}
                 </p>
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide truncate">
-                    {user?.role || "Staff"}
-                  </span>
-                  {user?.role === "admin" && (
-                    <ShieldCheck size={10} className="text-cyan-600" />
+
+                <div className="flex flex-col mt-0.5 gap-1">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide truncate">
+                      {user?.role || "Staff"}
+                    </span>
+                    {user?.role === "admin" && (
+                      <ShieldCheck size={10} className="text-cyan-600" />
+                    )}
+                  </div>
+
+                  {/* UX IMPROVEMENT: Badge Penempatan Instalasi */}
+                  {["lab"].includes(user?.role) && (
+                    <span
+                      className="text-[9px] bg-cyan-50 text-cyan-700 border border-cyan-100 px-1.5 py-0.5 rounded flex items-center gap-1 w-fit truncate"
+                      title={userInstalasiName}
+                    >
+                      <FlaskConical size={8} />{" "}
+                      {userInstalasiName || "Menunggu Penempatan"}
+                    </span>
                   )}
                 </div>
               </div>

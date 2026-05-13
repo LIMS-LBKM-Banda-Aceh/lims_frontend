@@ -57,16 +57,12 @@ const parseRefConfig = (rujukanString) => {
 };
 
 // --- UI/UX RENDERER KHUSUS LHU ---
-// Parameter kedua `satuan` ditambahkan untuk merender satuan di samping angka
 const renderLhuReference = (config, satuan) => {
   if (!config) return "-";
 
-  // Amankan format satuan (hanya tampil jika valid)
   const unitText =
     satuan && satuan !== "-" && satuan.trim() !== "" ? ` ${satuan}` : "";
 
-  // [BEST PRACTICE]: Jangan tempel satuan ke teks_bebas, karena biasanya admin sudah
-  // mengetik satuan secara manual di dalam teks bebas tersebut.
   if (config.jenis === "teks") return config.teks_bebas || "-";
 
   if (config.jenis === "kualitatif") return config.kualitatif?.normal || "-";
@@ -108,20 +104,29 @@ const renderLhuReference = (config, satuan) => {
 // ---------------------------------
 
 export default function LHUPrintTemplate({ data }) {
-  const [signatureMode, setSignatureMode] = useState("qr");
+  const [appSettings, setAppSettings] = useState({
+    signatureMode: "qr",
+    kodeLaboratorium: "",
+    useKopSurat: true,
+  });
 
   useEffect(() => {
-    const fetchSignatureMode = async () => {
+    const fetchSettings = async () => {
       try {
         const res = await api.get("/settings");
-        if (res.data.success && res.data.data.signature_mode) {
-          setSignatureMode(res.data.data.signature_mode);
+        if (res.data.success) {
+          setAppSettings({
+            signatureMode: res.data.data.signature_mode || "qr",
+            kodeLaboratorium: res.data.data.kode_laboratorium || "-",
+            // Default true jika belum di set
+            useKopSurat: res.data.data.use_kop_surat !== "false",
+          });
         }
       } catch (error) {
-        console.error("Gagal mengambil pengaturan signature", error);
+        console.error("Gagal mengambil pengaturan LHU", error);
       }
     };
-    fetchSignatureMode();
+    fetchSettings();
   }, []);
 
   if (!data) return null;
@@ -144,6 +149,7 @@ export default function LHUPrintTemplate({ data }) {
     lab_id: data.no_sampel_lab,
     pasien: data.nama_pasien,
     status: "VALIDATED",
+    verifikator: data.verifikator || "-",
     validator: validatorName,
     date: data.validated_at || new Date().toISOString(),
   });
@@ -161,95 +167,139 @@ export default function LHUPrintTemplate({ data }) {
   };
 
   return (
-    <div className="font-sans text-black max-w-[21cm] mx-auto print:w-full print:max-w-none">
-      {/* HEADER KOP SURAT */}
-      <div className="flex justify-between items-center mb-6 pb-4">
-        <img
-          src={kopMailImg}
-          alt="Logo"
-          className="w-auto object-contain"
-          onError={(e) => {
-            e.target.style.display = "none";
-          }}
-        />
-      </div>
+    <div className="lhu-print font-sans text-black max-w-[21cm] mx-auto print:w-full print:max-w-none relative">
+      {/* HEADER KOP SURAT (Render Bersyarat) */}
+      {appSettings.useKopSurat && (
+        <div className="flex justify-between items-center mb-2">
+          <img
+            src={kopMailImg}
+            alt="Kop Surat"
+            className="w-auto object-contain"
+            onError={(e) => {
+              e.target.style.display = "none";
+            }}
+          />
+        </div>
+      )}
 
-      <h3 className="text-center font-bold text-lg mb-6">
-        FORMULIR HASIL PEMERIKSAAN LABORATORIUM
+      {/* Jika kop surat disembunyikan, berikan sedikit padding atas pengganti ruang agar tidak mentok ujung kertas */}
+      {!appSettings.useKopSurat && <div className="pt-10"></div>}
+
+      <h3 className="text-center font-bold text-lg mb-2 mt-4">
+        LAPORAN HASIL PEMERIKSAAN LABORATORIUM
       </h3>
 
       {/* INFO PASIEN TABLE */}
-      <div className="grid grid-cols-2 gap-8 text-sm mb-6 break-inside-avoid">
-        <table>
+      <div className="grid grid-cols-2 gap-8 text-sm mb-4 break-inside-avoid">
+        {/* TABEL KIRI */}
+        <table className="w-full">
           <tbody>
             <tr>
-              <td className="w-32 py-1">Dokter</td>
-              <td>
-                : {data.dokter || "-"}
+              <td className="w-32 align-top pb-1">Dokter</td>
+              <td className="w-2 align-top pb-1 px-1">:</td>
+              <td className="align-top pb-1">{data.dokter || "-"}</td>
+            </tr>
+            <tr>
+              <td className="w-32 align-top pb-1">Alamat Dokter</td>
+              <td className="w-2 align-top pb-1 px-1">:</td>
+              <td className="align-top pb-1">{data.alamat_dokter || "-"}</td>
+            </tr>
+            <tr>
+              <td className="align-top pb-1">Nama Pasien</td>
+              <td className="align-top pb-1 px-1">:</td>
+              <td className="align-top pb-1 font-bold">{data.nama_pasien}</td>
+            </tr>
+            <tr>
+              <td className="align-top pb-1">Tanggal Lahir</td>
+              <td className="align-top pb-1 px-1">:</td>
+              <td className="align-top pb-1">{formatDate(data.tgl_lahir)}</td>
+            </tr>
+            <tr>
+              <td className="align-top pb-1">Jenis Kelamin</td>
+              <td className="align-top pb-1 px-1">:</td>
+              <td className="align-top pb-1">
+                {data.jenis_kelamin === "L"
+                  ? "Laki-laki"
+                  : data.jenis_kelamin === "P"
+                    ? "Perempuan"
+                    : data.jenis_kelamin || "-"}
               </td>
             </tr>
             <tr>
-              <td className="w-32 py-1">No. Rekam Medik</td>
-              <td>
-                : {data.no_rekam_medik || "-"}
-              </td>
+              <td className="align-top pb-1">NIK</td>
+              <td className="align-top pb-1 px-1">:</td>
+              <td className="align-top pb-1">{data.nik || "-"}</td>
             </tr>
             <tr>
-              <td className="py-1">Nama Pasien</td>
-              <td>
-                : <b>{data.nama_pasien}</b>
-              </td>
+              <td className="align-top pb-1">No. HP/Telepon</td>
+              <td className="align-top pb-1 px-1">:</td>
+              <td className="align-top pb-1">{data.no_kontak || "-"}</td>
             </tr>
             <tr>
-              <td className="py-1">Tanggal Lahir</td>
-              <td>: {formatDate(data.tgl_lahir)}</td>
-            </tr>
-            <tr>
-              <td className="py-1">NIK</td>
-              <td>: {data.nik || "-"}</td>
-            </tr>
-            <tr>
-              <td className="py-1">Alamat</td>
-              <td>: {data.alamat || "-"}</td>
-            </tr>
-            <tr>
-              <td className="py-1">No. HP/Telepon</td>
-              <td>: {data.no_kontak || "-"}</td>
+              <td className="align-top">Alamat Pasien</td>
+              <td className="align-top px-1">:</td>
+              <td className="align-top">{data.alamat || "-"}</td>
             </tr>
           </tbody>
         </table>
 
-        <table>
+        {/* TABEL KANAN */}
+        <table className="w-full">
           <tbody>
             <tr>
-              <td className="py-1">No. Registrasi</td>
-              <td>: {data.no_reg}</td>
+              <td className="w-40 align-top pb-1">No. Registrasi</td>
+              <td className="w-2 align-top pb-1 px-1">:</td>
+              <td className="align-top pb-1">{data.no_reg}</td>
             </tr>
             <tr>
-              <td className="py-1">Nomor Sampel</td>
-              <td>: {data.no_sampel_lab}</td>
+              <td className="align-top pb-1">No. Rekam Medik</td>
+              <td className="align-top pb-1 px-1">:</td>
+              <td className="align-top pb-1">{data.no_rekam_medik || "-"}</td>
             </tr>
             <tr>
-              <td className="py-1">Tgl/Waktu Daftar</td>
-              <td>
-                : {formatDate(data.tgl_daftar)} -{" "}
+              <td className="align-top pb-1 whitespace-nowrap">
+                Kode Laboratorium
+              </td>
+              <td className="align-top pb-1 px-1">:</td>
+              <td className="align-top pb-1">
+                {appSettings.kodeLaboratorium || "-"}
+              </td>
+            </tr>
+            <tr>
+              <td className="align-top pb-1 whitespace-nowrap">
+                Jenis Spesimen/Sampel
+              </td>
+              <td className="align-top pb-1 px-1">:</td>
+              <td className="align-top pb-1">{data.jenis_spesimen || "-"}</td>
+            </tr>
+            <tr>
+              <td className="align-top pb-1 whitespace-nowrap">
+                Kode Spesimen/Sampel
+              </td>
+              <td className="align-top pb-1 px-1">:</td>
+              <td className="align-top pb-1">{data.no_sampel_lab}</td>
+            </tr>
+            <tr>
+              <td className="align-top pb-1">Tgl/Jam Daftar</td>
+              <td className="align-top pb-1 px-1">:</td>
+              <td className="align-top pb-1">
+                {formatDate(data.tgl_daftar)} -{" "}
                 {formatTimeStr(data.waktu_daftar)} WIB
               </td>
             </tr>
-            {/* POIN 2 & 3: Waktu Pengambilan Sampel & Jam Terbit Hasil */}
             <tr>
-              <td className="py-1">Jam Waktu Sampling</td>
-              <td>
-                :{" "}
+              <td className="align-top pb-1">Jam Terima/Sampling</td>
+              <td className="align-top pb-1 px-1">:</td>
+              <td className="align-top pb-1">
                 {data.waktu_pengambilan
                   ? formatTimeStr(data.waktu_pengambilan) + " WIB"
                   : "-"}
               </td>
             </tr>
             <tr>
-              <td className="py-1">Jam Terbit Hasil</td>
-              <td>
-                :{" "}
+              <td className="align-top">Jam Terbit Hasil</td>
+              <td className="align-top px-1">:</td>
+              <td className="align-top">
                 {data.validated_at
                   ? formatTimeStr(data.validated_at) + " WIB"
                   : "Belum terbit"}
@@ -260,7 +310,7 @@ export default function LHUPrintTemplate({ data }) {
       </div>
 
       {/* HASIL TABLE */}
-      <table className="w-full border-collapse border border-black text-sm mb-8">
+      <table className="w-full border-collapse border border-black text-sm mb-4">
         <thead className="bg-gray-100 print:table-header-group">
           <tr>
             <th className="border border-black p-2 text-left">
@@ -270,9 +320,8 @@ export default function LHUPrintTemplate({ data }) {
             <th className="border border-black p-2 text-center">
               NILAI RUJUKAN
             </th>
-            <th className="border border-black p-2 text-center">
-              SATUAN / METODE
-            </th>
+            <th className="border border-black p-2 text-center">SATUAN</th>
+            <th className="border border-black p-2 text-center">METODE</th>
           </tr>
         </thead>
         <tbody>
@@ -280,6 +329,7 @@ export default function LHUPrintTemplate({ data }) {
             <td className="border border-black px-2 py-1.5 font-bold uppercase text-left tracking-wide">
               {masterCategoryName}
             </td>
+            <td className="border border-black px-2 py-1.5"></td>
             <td className="border border-black px-2 py-1.5"></td>
             <td className="border border-black px-2 py-1.5"></td>
             <td className="border border-black px-2 py-1.5"></td>
@@ -302,13 +352,13 @@ export default function LHUPrintTemplate({ data }) {
                     {test.nilai}
                   </td>
                   <td className="border border-black p-2 text-center align-middle">
-                    {/* Render dengan pelemparan variabel Satuan */}
                     {renderLhuReference(config, test.satuan)}
                   </td>
                   <td className="border border-black p-2 text-center">
                     {test.satuan}
-                    <br />
-                    <span className="text-[10px] uppercase">{test.metode}</span>
+                  </td>
+                  <td className="border border-black p-2 text-center text-[11px] uppercase">
+                    {test.metode}
                   </td>
                 </tr>
               );
@@ -317,20 +367,25 @@ export default function LHUPrintTemplate({ data }) {
       </table>
 
       {/* FOOTER TTD & QR CODE */}
-      {/* Diubah jadi flex-row, justify-between, */}
-      <div className="flex w-full justify-between break-inside-avoid page-break-inside-avoid">
+      <div className="flex w-full justify-between break-inside-avoid page-break-inside-avoid mt-4">
         {/* KIRI: INFO VALIDATOR */}
         <div className="text-sm mb-6">
           <table>
             <tbody>
               <tr>
-                <td className="py-1 pr-4 whitespace-nowrap">Validator</td>
+                <td className="pr-4 whitespace-nowrap">Pemeriksa</td>
+                <td>: {data.pemeriksa || "-"}</td>
+              </tr>
+              <tr>
+                <td className="pr-4 whitespace-nowrap">Verifikator</td>
+                <td>: {data.verifikator || "-"}</td>
+              </tr>
+              <tr>
+                <td className="pr-4 whitespace-nowrap">Validator</td>
                 <td>: {data.validator || "Belum divalidasi"}</td>
               </tr>
               <tr>
-                <td className="py-1 pr-4 whitespace-nowrap">
-                  Tanggal Validasi
-                </td>
+                <td className="pr-4 whitespace-nowrap">Tanggal Validasi</td>
                 <td>
                   : {data.validated_at ? formatDate(data.validated_at) : "-"}
                 </td>
@@ -355,7 +410,7 @@ export default function LHUPrintTemplate({ data }) {
           </p>
 
           <div className="py-2">
-            {signatureMode === "qr" ? (
+            {appSettings.signatureMode === "qr" ? (
               <QRCode
                 value={qrValidationData}
                 size={90}
@@ -367,7 +422,7 @@ export default function LHUPrintTemplate({ data }) {
             )}
           </div>
 
-          {signatureMode === "qr" && (
+          {appSettings.signatureMode === "qr" && (
             <span className="text-[9px] text-gray-400 mb-1 block">
               Dokumen ini ditandatangani secara elektronik
             </span>
@@ -375,6 +430,8 @@ export default function LHUPrintTemplate({ data }) {
           <p className="font-bold text-sm underline">{validatorName}</p>
         </div>
       </div>
+
+      <div className="lhu-page-number"></div>
     </div>
   );
 }
