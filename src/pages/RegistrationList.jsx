@@ -13,8 +13,9 @@ import {
   ListFilter,
   ArrowRight,
   AlertCircle,
-  ChevronLeft, // <-- Tambahkan icon untuk pagination
-  ChevronRight, // <-- Tambahkan icon untuk pagination
+  ChevronLeft,
+  ChevronRight,
+  Send,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
@@ -156,6 +157,22 @@ export default function RegistrationList({
       .join("")
       .substring(0, 2)
       .toUpperCase();
+  };
+
+  const handleDirectToLab = async (id, noReg) => {
+    if (
+      !confirm(
+        `Konfirmasi: Sampel fisik Rujukan untuk ${noReg} sudah diterima dan siap diteruskan langsung ke Lab?`,
+      )
+    )
+      return;
+    try {
+      await api.put(`/registrations/${id}/send-to-lab`);
+      toast.success(`Sampel rujukan ${noReg} diteruskan ke Laboratorium!`);
+      if (onRefresh) onRefresh();
+    } catch (error) {
+      toast.error("Gagal meneruskan sampel ke lab");
+    }
   };
 
   const containerClass = isDashboard
@@ -312,7 +329,8 @@ export default function RegistrationList({
                               className="flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 px-1.5 py-[2px] rounded text-[9px] font-extrabold tracking-wide cursor-help shadow-sm"
                               title="Perhatian: Nomor Invoice belum diset / disimpan!"
                             >
-                              <AlertCircle size={10} strokeWidth={2.5} /> Belum bayar
+                              <AlertCircle size={10} strokeWidth={2.5} /> Belum
+                              bayar
                             </span>
                           )}
                         </div>
@@ -374,33 +392,54 @@ export default function RegistrationList({
                         >
                           <Eye size={18} />
                         </button>
-                        {!isDashboard &&
-                          (user?.role === "admin" ||
-                            (user?.role === "input" &&
-                              item.status === "terdaftar")) && (
-                            <>
-                              <button
-                                onClick={() => handleEdit(item.id)}
-                                className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-xl transition-colors"
-                                title="Edit Data"
-                              >
-                                <Edit size={18} />
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleDelete(item.id, item.no_reg)
-                                }
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                                title={
-                                  user?.role === "admin"
-                                    ? "Hapus Permanen"
-                                    : "Hapus Registrasi"
-                                }
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                            </>
-                          )}
+
+                        {!isDashboard && (
+                          <>
+                            {/* LOGIC BYPASS RUJUKAN: Munculkan tombol Kirim ke Lab untuk Input/Kasir/Admin jika asal_sampel Rujukan */}
+                            {item.status === "terdaftar" &&
+                              item.asal_sampel === "Rujukan" &&
+                              ["admin", "input", "kasir"].includes(
+                                user?.role,
+                              ) && (
+                                <button
+                                  onClick={() =>
+                                    handleDirectToLab(item.id, item.no_reg)
+                                  }
+                                  className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
+                                  title="Bypass: Teruskan Langsung Ke Lab"
+                                >
+                                  <Send size={18} />
+                                </button>
+                              )}
+
+                            {(user?.role === "admin" ||
+                              (user?.role === "input" &&
+                                item.status === "terdaftar")) && (
+                              <>
+                                <button
+                                  onClick={() => handleEdit(item.id)}
+                                  className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-xl transition-colors"
+                                  title="Edit Data"
+                                >
+                                  <Edit size={18} />
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleDelete(item.id, item.no_reg)
+                                  }
+                                  className="p-2 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                                  title={
+                                    user?.role === "admin"
+                                      ? "Hapus Permanen"
+                                      : "Hapus Registrasi"
+                                  }
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              </>
+                            )}
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

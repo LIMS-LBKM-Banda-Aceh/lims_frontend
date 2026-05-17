@@ -10,6 +10,7 @@ import {
   ArrowUp,
   ArrowDown,
   Layers,
+  Droplets
 } from "lucide-react";
 
 // --- ROBUST SMART PARSER FIX ---
@@ -175,11 +176,13 @@ export const smartAnalyzeResult = (nilai, config, gender) => {
 export default function ResultInputModal({
   registrationId,
   noSampel,
+  initialSpesimen,
   onClose,
 }) {
   const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [jenisSpesimen, setJenisSpesimen] = useState(initialSpesimen || "");
 
   useEffect(() => {
     const fetchTests = async () => {
@@ -227,6 +230,13 @@ export default function ResultInputModal({
 
     try {
       setSaving(true);
+      
+      // 1. SIMPAN DULU JENIS SPESIMENNYA KE BACKEND
+      await api.put(`/registrations/${registrationId}/spesimen`, { 
+        jenis_spesimen: jenisSpesimen 
+      });
+
+      // 2. KEMUDIAN SIMPAN HASIL TESNYA
       const savePromises = tests.map((test) => {
         return api.put(`/tests/${test.id}/result`, { nilai: test.nilai || "" });
       });
@@ -265,7 +275,26 @@ export default function ResultInputModal({
             <X size={20} className="text-gray-500" />
           </button>
         </div>
-
+        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row gap-4 items-start md:items-center">
+          <div className="w-full md:w-1/3">
+            <label className="block text-[11px] uppercase font-bold text-gray-500 mb-1.5 items-center gap-1">
+              <Droplets size={12} className="text-cyan-600" /> Jenis Spesimen /
+              Sampel
+            </label>
+            <input
+              type="text"
+              value={jenisSpesimen}
+              onChange={(e) => setJenisSpesimen(e.target.value)}
+              placeholder="Contoh: Darah EDTA, Serum, Swab..."
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan-500 font-semibold text-gray-700 bg-white shadow-sm"
+              disabled={saving}
+            />
+          </div>
+          <div className="text-xs text-gray-400 mt-4 md:mt-0 italic">
+            * Wajib diisi agar tercetak dengan benar pada Laporan Hasil Uji
+            (LHU).
+          </div>
+        </div>
         <div className="p-0 overflow-y-auto flex-1 custom-scrollbar">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12">
