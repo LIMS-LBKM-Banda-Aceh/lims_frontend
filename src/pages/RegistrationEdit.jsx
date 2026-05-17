@@ -480,12 +480,11 @@ export default function RegistrationEdit() {
   };
 
   const handleAsalSampelChange = (e) => {
-    const val = e.target.value;
-    const newStatus = val === "Mandiri" ? "berbayar" : prev.status_pembayaran;
+    const val = e.target.value;    
     setForm((prev) => ({
       ...prev,
       asal_sampel: val,
-      status_pembayaran: newStatus,
+      status_pembayaran: val === "Mandiri" ? "berbayar" : prev.status_pembayaran,
     }));
   };
 

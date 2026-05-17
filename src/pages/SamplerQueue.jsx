@@ -55,10 +55,11 @@ export default function SamplerQueue({ onRefreshStats }) {
       }
 
       if (regRes.data.success) {
-        const relevantData = regRes.data.data.filter((item) =>
-          ["terdaftar", "proses_sampling"].includes(item.status),
+        const relevantData = regRes.data.data.filter(
+          (item) =>
+            ["terdaftar", "proses_sampling"].includes(item.status) &&
+            item.asal_sampel === "Mandiri", // <-- UX FIX: HANYA TAMPILKAN PASIEN MANDIRI
         );
-        setDataList(relevantData);
       }
     } catch (err) {
       console.error(err);

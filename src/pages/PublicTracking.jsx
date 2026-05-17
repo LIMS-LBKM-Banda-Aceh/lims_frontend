@@ -37,7 +37,10 @@ const itemVar = {
 };
 
 // --- SUB-COMPONENT: TRACKING STEPS ---
-const TrackingSteps = ({ activeIndex }) => {
+const TrackingSteps = ({ activeIndex, asalSampel }) => {
+  // Susun label secara dinamis
+  const isRujukan = asalSampel === "Rujukan";
+
   const stepsConfig = [
     {
       id: 0,
@@ -45,7 +48,12 @@ const TrackingSteps = ({ activeIndex }) => {
       desc: "Administrasi Terverifikasi",
       icon: FileText,
     },
-    { id: 1, title: "Sampling", desc: "Pengambilan Sampel", icon: Syringe },
+    {
+      id: 1,
+      title: isRujukan ? "Penyerahan" : "Sampling",
+      desc: isRujukan ? "Sampel Diserahkan" : "Pengambilan Sampel",
+      icon: isRujukan ? CheckCircle : Syringe,
+    },
     { id: 2, title: "Antrian Lab", desc: "Sampel Diterima Lab", icon: Clock },
     {
       id: 3,
@@ -380,7 +388,10 @@ export default function PublicTracking() {
                 </div>
 
                 {/* Stepper Component */}
-                <TrackingSteps activeIndex={getActiveIndex(result.status)} />
+                <TrackingSteps
+                  activeIndex={getActiveIndex(result.status)}
+                  asalSampel={result.asal_sampel}
+                />
 
                 {/* Call to Action: Download Area */}
                 <AnimatePresence>
