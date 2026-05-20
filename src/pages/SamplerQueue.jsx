@@ -60,6 +60,7 @@ export default function SamplerQueue({ onRefreshStats }) {
             ["terdaftar", "proses_sampling"].includes(item.status) &&
             item.asal_sampel === "Mandiri", // <-- UX FIX: HANYA TAMPILKAN PASIEN MANDIRI
         );
+        setDataList(relevantData);
       }
     } catch (err) {
       console.error(err);
