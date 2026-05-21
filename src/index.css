@@ -2,100 +2,50 @@
 
 @import "tailwindcss";
 
-@theme {
+:root {
   --color-primary: #07b8a3;
   --color-secondary: #c4db28;
   --color-hover: #058172;
 }
+
 @media print {
-  /* 1. Atur halaman kertas bersih tanpa margin bawaan browser */
   @page {
-    margin: 0mm !important; /* PENTING: Reset margin browser ke 0 */
+    /* Margin untuk memberi ruang bagi footer */
+    margin: 15mm 15mm 20mm 15mm !important;
     size: auto;
+
+    /* Cara Professional: Menggunakan margin bottom untuk menaruh nomor halaman */
+    @bottom-center {
+      content: "Halaman " counter(page) "/" counter(pages);
+      font-size: 10px;
+      color: #666;
+      /* border-top: 1px dashed #cbd5e1; */
+      padding-top: 5px;
+    }
   }
 
-  /* 2. Sembunyikan semua element body */
   body * {
     visibility: hidden;
   }
 
-  /* 3. Tampilkan wrapper print section & semua anaknya */
   #print-section,
   #print-section * {
     visibility: visible;
   }
 
-  /* 4. Konfigurasi Container Print Section */
   #print-section {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
-    right: 0 !important;
-
-    /* Gunakan width 100% dari kertas */
     width: 100% !important;
-
-    /* PENTING: Padding 25mm (2.5cm) di semua sisi */
-    padding: 16mm !important;
-
-    /* Pastikan padding tidak membuat konten melebar keluar kertas */
-    box-sizing: border-box !important;
-
-    /* Reset background agar bersih */
-    background: white !important;
+    padding: 0 !important;
     margin: 0 !important;
   }
 
-  /* 5. Pastikan helper class (opsional, untuk safety) */
-  .print-content-padding {
-    padding: 20mm !important;
-  }
-
-  /* 6. Utility lain */
+  /* Sembunyikan elemen UI lainnya */
+  .Toastify,
   .print\:hidden {
     display: none !important;
-  }
-  .print\:block {
-    display: block !important;
-  }
-  .print\:flex {
-    display: flex !important;
-  }
-
-  .lhu-print {
-    counter-reset: page;
-    padding-bottom: 20mm !important;
-  }
-
-  .lhu-page-number {
-    position: fixed;
-    bottom: 6mm;
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-size: 11px;
-    color: #666;
-  }
-
-  .lhu-page-number::after {
-    content: "Halaman " counter(page) " / " counter(pages);
-  }
-
-  /* Hindari tabel pecah jelek */
-  .lhu-print table {
-    page-break-inside: auto;
-  }
-
-  .lhu-print tr {
-    page-break-inside: avoid;
-    page-break-after: auto;
-  }
-
-  .lhu-print thead {
-    display: table-header-group;
-  }
-
-  .lhu-print tfoot {
-    display: table-footer-group;
+    visibility: hidden !important;
   }
 }
