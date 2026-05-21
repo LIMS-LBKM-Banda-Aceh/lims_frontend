@@ -190,11 +190,11 @@ export default function PublicTracking() {
   };
 
   const handleDownloadLHU = async () => {
-    // LOGIKA: Cek apakah ada file custom LHU
+    // LOGIKA: Cek apakah ada file custom LHU hasil upload
     if (result.link_hasil && result.link_hasil.includes("custom_lhu_")) {
-      // PROSES DOWNLOAD PDF CUSTOM (FILE UPLOAD MANDAT)
+      // PROSES DOWNLOAD PDF CUSTOM (FILE UPLOAD)
       const url = result.link_hasil;
-      const toastId = toast.loading("Mempersiapkan PDF...");
+      const toastId = toast.loading("Mempersiapkan unduhan PDF...");
       try {
         const response = await axios.get(url, { responseType: "blob" });
         const blob = new Blob([response.data], { type: "application/pdf" });
@@ -220,9 +220,15 @@ export default function PublicTracking() {
         });
       }
     } else {
-      // PROSES DOWNLOAD LHU AUTO-GENERATE BY SYSTEM (Via Browser Print)
-      // Print dialog secara default memicu "Save as PDF" di sistem client (Chrome, Edge, Safari)
-      window.print();
+      // PROSES DOWNLOAD LHU AUTO-GENERATE BY SYSTEM
+      // BEST PRACTICE: Gunakan setTimeout agar DOM selesai di-render (termasuk gambar KOP dan QR Code)
+      // sebelum dialog window.print() mem-freeze eksekusi JavaScript.
+      const toastId = toast.loading("Mempersiapkan dokumen LHU...");
+
+      setTimeout(() => {
+        toast.dismiss(toastId);
+        window.print();
+      }, 800);
     }
   };
 
@@ -252,7 +258,6 @@ export default function PublicTracking() {
         </motion.div>
 
         {/* Search Section */}
-        {/* ... (TETAP SAMA SEPERTI KODE SEBELUMNYA) ... */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -450,8 +455,8 @@ export default function PublicTracking() {
       {/* --- RENDER TEMPLATE KHUSUS CETAK/PRINT DI SINI (Tersembunyi via CSS) --- */}
       {result && result.status === "selesai" && (
         <div
-          id="public-print-section"
-          className="hidden print:block absolute top-0 left-0 w-full min-h-screen bg-white z-9999"
+          id="print-section"
+          className="hidden print:block absolute top-0 left-0 w-full min-h-screen bg-white z-[9999]"
         >
           <LHUPrintTemplate data={result} />
         </div>

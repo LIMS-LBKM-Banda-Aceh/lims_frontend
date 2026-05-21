@@ -147,7 +147,7 @@ export default function DataManagement({ onRefreshStats }) {
     return processedData.slice(startIndex, startIndex + itemsPerPage);
   }, [processedData, currentPage, itemsPerPage]);
 
-  const totalPages = Math.ceil(processedData.length / itemsPerPage);
+  const totalPages = Math.ceil(processedData.length / itemsPerPage) || 1;
 
   const handleOpenPreview = async (id) => {
     const toastId = toast.loading("Memuat rincian hasil...");

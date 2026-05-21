@@ -1,3 +1,5 @@
+// components/LHUPrintTemplate.jsx
+
 import React, { useState, useEffect } from "react";
 import kopMailImg from "../assets/kop_mail.png";
 import QRCode from "react-qr-code";
@@ -431,7 +433,7 @@ export default function LHUPrintTemplate({ data }) {
         </div>
       </div>
 
-      <div className="lhu-page-number"></div>
+      {/* <div className="lhu-page-number"></div> */}
     </div>
   );
 }
