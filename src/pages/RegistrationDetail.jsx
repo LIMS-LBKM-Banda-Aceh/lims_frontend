@@ -258,7 +258,7 @@ export default function RegistrationDetail({ data, onBack }) {
           ) : null}
 
           <div
-            className={`${isGratis ? "bg-secondary" : "bg-primary"} text-white print:bg-gray-100 print:text-black px-2 py-3 flex justify-between items-center`}
+            className={`${isGratis ? "bg-green-500" : "bg-cyan-500"} text-white print:bg-gray-100 print:text-black px-2 py-3 flex justify-between items-center`}
           >
             <span className="font-bold text-xs uppercase tracking-wider">
               {isGratis
@@ -466,7 +466,7 @@ export default function RegistrationDetail({ data, onBack }) {
 
         {/* --- MAIN CARD --- */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden print:shadow-none print:border-0 print:rounded-none">
-          <div className="bg-linear-to-r from-secondary to-primary p-8 text-white print:text-black print:bg-none print:p-0 print:border-b print:pb-4 print:mb-4">
+          <div className="bg-linear-to-r from-teal-500 to-cyan-600 p-8 text-white print:text-black print:bg-none print:p-0 print:border-b print:pb-4 print:mb-4">
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-white text-xs font-bold uppercase mb-1 print:text-gray-400">

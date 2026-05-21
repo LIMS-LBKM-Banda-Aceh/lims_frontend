@@ -71,7 +71,7 @@ export default function LandingPage() {
           </div>
 
           <Link to="/login">
-            <button className="flex items-center gap-2 bg-linear-to-r from-cyan-600 to-primary text-white px-6 py-2.5 rounded-full font-medium text-sm shadow-lg shadow-cyan-200 hover:shadow-cyan-300 hover:scale-105 transition-all duration-300">
+            <button className="flex items-center gap-2 bg-linear-to-r from-cyan-600 to-teal-500 text-white px-6 py-2.5 rounded-full font-medium text-sm shadow-lg shadow-cyan-200 hover:shadow-cyan-300 hover:scale-105 transition-all duration-300">
               <LogIn size={16} /> Masuk Sistem
             </button>
           </Link>
@@ -98,7 +98,7 @@ export default function LandingPage() {
             </span>
             <h1 className="text-4xl lg:text-6xl font-extrabold text-gray-900 leading-[1.15] mb-6">
               Selamat datang di LIMS Labkesmas{" "}
-              <span className="text-transparent bg-clip-text bg-linear-to-r from-cyan-500 to-primary">
+              <span className="text-transparent bg-clip-text bg-linear-to-r from-cyan-500 to-teal-500">
                 Banda Aceh
               </span>
             </h1>
@@ -212,7 +212,7 @@ export default function LandingPage() {
       {/* --- PROFILE SECTION --- */}
       <section
         id="profil"
-        className="py-24 bg-linear-to-br from-cyan-600 to-primary text-white relative overflow-hidden"
+        className="py-24 bg-linear-to-br from-cyan-600 to-teal-500 text-white relative overflow-hidden"
       >
         {/* Background Pattern - Diperhalus agar tidak mengganggu keterbacaan */}
         <div

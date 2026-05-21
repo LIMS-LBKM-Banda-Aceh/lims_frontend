@@ -176,7 +176,7 @@ export default function UserManagement() {
         </div>
         <button
           onClick={handleAddNew}
-          className="bg-primary text-white px-4 py-2.5 rounded-xl font-semibold shadow-lg shadow-blue-200 hover:shadow-blue-300 hover:-translate-y-1 transition-all flex items-center gap-2"
+          className="bg-teal-500 text-white px-4 py-2.5 rounded-xl font-semibold shadow-lg shadow-blue-200 hover:shadow-blue-300 hover:-translate-y-1 transition-all flex items-center gap-2"
         >
           <Plus size={18} /> Tambah User
         </button>
