@@ -621,6 +621,17 @@ export default function LabQueue({ onRefreshStats }) {
     return acc;
   }, {});
 
+  const getDuration = (start, end) => {
+    if (!start || !end) return "-";
+    const diffMs = new Date(end) - new Date(start);
+    if (diffMs <= 0) return "< 1 menit";
+    const diffMins = Math.floor(diffMs / 60000);
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    if (hours > 0) return `${hours}j ${mins}m`;
+    return `${mins} menit`;
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in p-2 md:p-0">
       {/* --- UI TOGGLE SWITCHER (HANYA UNTUK ROLE LAB SEBAGAI UI UX WORKSPACE) --- */}
@@ -1070,7 +1081,7 @@ export default function LabQueue({ onRefreshStats }) {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 bg-white space-y-6 custom-scrollbar">
-              <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 grid grid-cols-2 md:grid-cols-4 gap-y-4 gap-x-8">
+              <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 grid grid-cols-2 md:grid-cols-5 gap-y-4 gap-x-6">
                 <div>
                   <p className="text-[10px] uppercase font-bold text-gray-400 mb-0.5">
                     Nama Pasien
@@ -1100,6 +1111,32 @@ export default function LabQueue({ onRefreshStats }) {
                           minute: "2-digit",
                         }) + " WIB"
                       : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-gray-400 mb-0.5">
+                    Selesai Input
+                  </p>
+                  <p className="text-sm font-semibold text-gray-700">
+                    {previewData.waktu_selesai_periksa
+                      ? new Date(
+                          previewData.waktu_selesai_periksa,
+                        ).toLocaleString("id-ID", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }) + " WIB"
+                      : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-gray-400 mb-0.5">
+                    Durasi Analisis
+                  </p>
+                  <p className="text-sm font-semibold text-emerald-700 bg-emerald-100/50 w-fit px-2 py-0.5 rounded border border-emerald-200">
+                    {getDuration(
+                      previewData.waktu_mulai_periksa,
+                      previewData.waktu_selesai_periksa,
+                    )}
                   </p>
                 </div>
                 <div>
