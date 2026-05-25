@@ -10,7 +10,7 @@ import {
   ArrowUp,
   ArrowDown,
   Layers,
-  Droplets
+  Droplets,
 } from "lucide-react";
 
 // --- ROBUST SMART PARSER FIX ---
@@ -213,6 +213,12 @@ export default function ResultInputModal({
   };
 
   const handleSaveAll = async () => {
+    // BLOK VALIDASI JENIS SPESIMEN WAJIB DIISI
+    if (!jenisSpesimen || jenisSpesimen.trim() === "") {
+      toast.warn("Jenis Spesimen / Sampel wajib diisi!");
+      return;
+    }
+    // BLOK VALIDASI CEK ADA TIDAK TES YANG NILAINYA KOSONG
     const emptyTests = tests.filter(
       (t) => !t.nilai || t.nilai.toString().trim() === "",
     );
@@ -230,10 +236,10 @@ export default function ResultInputModal({
 
     try {
       setSaving(true);
-      
+
       // 1. SIMPAN DULU JENIS SPESIMENNYA KE BACKEND
-      await api.put(`/registrations/${registrationId}/spesimen`, { 
-        jenis_spesimen: jenisSpesimen 
+      await api.put(`/registrations/${registrationId}/spesimen`, {
+        jenis_spesimen: jenisSpesimen,
       });
 
       // 2. KEMUDIAN SIMPAN HASIL TESNYA
