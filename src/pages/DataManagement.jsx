@@ -690,29 +690,18 @@ export default function DataManagement({ onRefreshStats }) {
     }
   };
 
-  const getSafeLhuUrl = (rawLink) => {
+   const getSafeLhuUrl = (rawLink) => {
     if (!rawLink) return "#";
 
-    // Regex ini secara spesifik mengekstrak HANYA nama file PDF/DOC/XLS
-    // Mengabaikan duplikasi "http://localhost..." yang menumpuk di database
+    // Mengekstrak HANYA nama file PDF/DOC/XLS
     const match = rawLink.match(/(custom_lhu_[a-zA-Z0-9-]+\.[a-zA-Z0-9]+)/i);
 
     if (match && match[0]) {
       const fileName = match[0];
-
-      // Ambil base URL server dari environment (.env)
-      const apiBase =
-        import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
-
-      // Hapus '/api' di ujungnya untuk mendapatkan root domain server
-      const serverUrl = apiBase.replace(/\/api\/?$/, "");
-
-      // Kembalikan clean absolute path yang dijamin valid
-      return `${serverUrl}/public/results/${fileName}`;
-
-      // Opsi Alternatif: Jika kamu ingin memaksa file agar otomatis "Terdownload"
-      // (bukan terbuka Preview PDF di tab baru), manfaatkan rute /download dari server.js:
-      // return `${serverUrl}/download/${fileName}`;
+      const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+      
+      // Menggunakan rute API agar bypass masalah routing Nginx untuk file statis
+      return `${apiBase}/public/download/${fileName}`;
     }
 
     return rawLink;

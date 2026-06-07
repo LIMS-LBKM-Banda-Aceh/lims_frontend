@@ -192,19 +192,31 @@ export default function PublicTracking() {
   const handleDownloadLHU = async () => {
     // LOGIKA: Cek apakah ada file custom LHU hasil upload
     if (result.link_hasil && result.link_hasil.includes("custom_lhu_")) {
-      // PROSES DOWNLOAD PDF CUSTOM (FILE UPLOAD)
-      const url = result.link_hasil;
       const toastId = toast.loading("Mempersiapkan unduhan PDF...");
       try {
-        const response = await axios.get(url, { responseType: "blob" });
+        // 1. Ekstrak nama file dengan aman (mengabaikan URL lokal/server lama di DB)
+        const match = result.link_hasil.match(/(custom_lhu_[a-zA-Z0-9-]+\.[a-zA-Z0-9]+)/i);
+        if (!match || !match[0]) throw new Error("Format file tidak valid");
+        
+        const fileName = match[0];
+        
+        // 2. Gunakan VITE_API_BASE_URL agar dinamis mengikuti environment
+        const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+        const downloadUrl = `${apiBase}/public/download/${fileName}`;
+
+        // 3. Request blob menggunakan URL API yang aman
+        const response = await axios.get(downloadUrl, { responseType: "blob" });
         const blob = new Blob([response.data], { type: "application/pdf" });
-        const downloadUrl = window.URL.createObjectURL(blob);
+        const objectUrl = window.URL.createObjectURL(blob);
+        
         const link = document.createElement("a");
-        link.href = downloadUrl;
+        link.href = objectUrl;
         link.download = `LHU_CUSTOM_${result?.no_reg}.pdf`;
         document.body.appendChild(link);
         link.click();
         link.remove();
+        window.URL.revokeObjectURL(objectUrl);
+
         toast.update(toastId, {
           render: "LHU Berhasil diunduh",
           type: "success",
@@ -212,6 +224,7 @@ export default function PublicTracking() {
           autoClose: 2000,
         });
       } catch (e) {
+        console.error("Download Error:", e);
         toast.update(toastId, {
           render: "Gagal mengunduh file, pastikan internet stabil.",
           type: "error",
@@ -221,10 +234,7 @@ export default function PublicTracking() {
       }
     } else {
       // PROSES DOWNLOAD LHU AUTO-GENERATE BY SYSTEM
-      // BEST PRACTICE: Gunakan setTimeout agar DOM selesai di-render (termasuk gambar KOP dan QR Code)
-      // sebelum dialog window.print() mem-freeze eksekusi JavaScript.
       const toastId = toast.loading("Mempersiapkan dokumen LHU...");
-
       setTimeout(() => {
         toast.dismiss(toastId);
         window.print();
