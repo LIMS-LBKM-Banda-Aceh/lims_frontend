@@ -22,6 +22,7 @@ import api from "../api/axios";
 import { toast } from "react-toastify";
 import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
+import { getDetailedAge } from "../utils/ageHelper";
 
 export default function RegistrationList({
   data,
@@ -306,7 +307,13 @@ export default function RegistrationList({
                             {item.nama_pasien}
                           </div>
                           <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                            <span>{item.umur ? `${item.umur} Th` : "-"}</span>
+                            <span className="font-medium text-cyan-700">
+                              {/* Prioritaskan kalkulasi detail, jika gagal fallback ke data umur lama di DB */}
+                              {getDetailedAge(
+                                item.tgl_lahir,
+                                item.tgl_daftar,
+                              ) || (item.umur ? `${item.umur} Thn` : "-")}
+                            </span>
                             <span className="w-1 h-1 rounded-full bg-gray-300"></span>
                             <span>
                               {item.jenis_kelamin === "L"
