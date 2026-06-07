@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import api from "../api/axios";
 import { toast } from "react-toastify";
+import { getDetailedAge } from "../utils/ageHelper";
 
 import {
   Syringe,
@@ -447,8 +448,11 @@ export default function SamplerQueue({ onRefreshStats }) {
                               {item.nama_pasien}
                             </span>
                             <span className="text-gray-300 text-[10px]">●</span>
-                            <span className="text-gray-500 text-xs font-medium">
-                              {item.umur} Thn
+                            <span className="text-cyan-700 text-xs font-medium">
+                              {getDetailedAge(
+                                item.tgl_lahir,
+                                item.tgl_daftar,
+                              ) || (item.umur ? `${item.umur} Thn` : "-")}
                             </span>
                             <span className="text-gray-300 text-[10px]">●</span>
                             <span className="text-gray-500 text-xs font-medium uppercase">

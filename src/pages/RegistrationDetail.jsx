@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import api from "../api/axios";
 import { toast } from "react-toastify";
 import { useAuth } from "../context/AuthContext";
+import { getDetailedAge } from "../utils/ageHelper";
 import kopMailImg from "../assets/kop_mail.png";
 import QRCode from "react-qr-code";
 
@@ -176,14 +177,6 @@ export default function RegistrationDetail({ data, onBack }) {
     }, {});
 
     const items = Object.values(groupedDetails);
-
-    if (items.length === 0) {
-      return (
-        <div className="border border-dashed border-gray-300 rounded-xl p-4 text-center text-gray-400 text-sm">
-          Tidak ada rincian pemeriksaan.
-        </div>
-      );
-    }
 
     const midIndex = Math.ceil(items.length / 2);
     const leftColumnItems = items.slice(0, midIndex);
@@ -491,8 +484,6 @@ export default function RegistrationDetail({ data, onBack }) {
                 )}
               </div>
 
-
-              
               <div className="bg-white/20 px-4 py-1.5 rounded-full border border-white/30 print:border-black print:text-black">
                 <span className="font-bold text-sm uppercase">
                   {data.status}
@@ -538,9 +529,11 @@ export default function RegistrationDetail({ data, onBack }) {
                   </div>
                   <div className="grid grid-cols-3">
                     <span className="text-gray-500">Umur / JK</span>
-                    <span className="col-span-2">
-                      : {data.umur} Tahun /{" "}
-                      {data.jenis_kelamin === "L" ? "Laki-laki" : "Perempuan"}
+                    <span className="col-span-2 font-medium">
+                      :{" "}
+                      {getDetailedAge(data.tgl_lahir, data.tgl_daftar) ||
+                        `${data.umur || "-"} Tahun`}{" "}
+                      / {data.jenis_kelamin === "L" ? "Laki-laki" : "Perempuan"}
                     </span>
                   </div>
                   <div className="grid grid-cols-3">
@@ -555,7 +548,9 @@ export default function RegistrationDetail({ data, onBack }) {
                   </div>
                   <div className="grid grid-cols-3">
                     <span className="text-gray-500">Kontak</span>
-                    <span className="col-span-2">: {data.no_kontak || "-"}</span>
+                    <span className="col-span-2">
+                      : {data.no_kontak || "-"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -615,7 +610,7 @@ export default function RegistrationDetail({ data, onBack }) {
                   <div className="grid grid-cols-3">
                     <span className="text-gray-500">Catatan</span>
                     <span className="col-span-2 0 font-medium ">
-                      : {data.catatan_tambahan || "-"} 
+                      : {data.catatan_tambahan || "-"}
                     </span>
                   </div>
                 </div>
