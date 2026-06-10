@@ -6,7 +6,7 @@ import QRCode from "react-qr-code";
 import api from "../api/axios";
 import { formatDate, formatTime } from "../utils/dateHelper";
 
-// --- SMART PARSER ---
+// --- SMART PARSER V2 ---
 const parseRefConfig = (rujukanString) => {
   try {
     if (!rujukanString) return { jenis: "teks", teks_bebas: "-" };
@@ -28,15 +28,40 @@ const parseRefConfig = (rujukanString) => {
     if (minified.jenis) return minified;
 
     if (minified.j === "kan") {
-      return {
+      // Struktur baru dengan custom_refs
+      const parsed = {
         jenis: "kuantitatif",
-        beda_gender: minified.bg,
+        is_multi: minified.m || minified.bg || false,
         kuantitatif: {
           umum: minified.u || { min: "", max: "" },
-          L: minified.L || { min: "", max: "" },
-          P: minified.P || { min: "", max: "" },
+          custom_refs: [],
         },
       };
+
+      // Handle data lama (Backward compatibility)
+      if (minified.bg !== undefined) {
+        if (minified.L)
+          parsed.kuantitatif.custom_refs.push({
+            label: "Laki-laki",
+            min: minified.L.min,
+            max: minified.L.max,
+          });
+        if (minified.P)
+          parsed.kuantitatif.custom_refs.push({
+            label: "Perempuan",
+            min: minified.P.min,
+            max: minified.P.max,
+          });
+      }
+      // Handle data dinamis baru
+      else if (minified.r && Array.isArray(minified.r)) {
+        parsed.kuantitatif.custom_refs = minified.r.map((ref) => ({
+          label: ref.l,
+          min: ref.mn,
+          max: ref.mx,
+        }));
+      }
+      return parsed;
     } else if (minified.j === "kal") {
       return {
         jenis: "kualitatif",
@@ -66,29 +91,23 @@ const renderLhuReference = (config, satuan) => {
     satuan && satuan !== "-" && satuan.trim() !== "" ? ` ${satuan}` : "";
 
   if (config.jenis === "teks") return config.teks_bebas || "-";
-
   if (config.jenis === "kualitatif") return config.kualitatif?.normal || "-";
 
   if (config.jenis === "kuantitatif") {
-    if (config.beda_gender) {
-      const lMin = config.kuantitatif?.L?.min || "-";
-      const lMax = config.kuantitatif?.L?.max || "-";
-      const pMin = config.kuantitatif?.P?.min || "-";
-      const pMax = config.kuantitatif?.P?.max || "-";
-
+    // RENDER MULTI KATEGORI
+    if (config.is_multi && config.kuantitatif?.custom_refs?.length > 0) {
       return (
-        <div className="text-left inline-block text-[12px] leading-snug whitespace-nowrap">
-          <div>
-            <span className="font-semibold">Laki-laki</span> : {lMin} - {lMax}
-            {unitText}
-          </div>
-          <div>
-            <span className="font-semibold">Perempuan</span> : {pMin} - {pMax}
-            {unitText}
-          </div>
+        <div className="text-left inline-block text-[11px] leading-snug whitespace-nowrap">
+          {config.kuantitatif.custom_refs.map((ref, idx) => (
+            <div key={idx}>
+              <span className="font-semibold">{ref.label}</span> :{" "}
+              {ref.min || "-"} - {ref.max || "-"} {unitText}
+            </div>
+          ))}
         </div>
       );
     } else {
+      // RENDER UMUM (SATU BARIS)
       const umum = config.kuantitatif?.umum;
       if (
         umum &&
