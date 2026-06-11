@@ -214,6 +214,7 @@ const ReferenceValueBuilder = ({ value, onChange }) => {
 
   return (
     <div className="bg-gray-50/80 border border-gray-200 p-5 rounded-xl mt-1 space-y-5">
+      {/* TABS BUTTON */}
       <div className="flex p-1 bg-gray-200/60 rounded-xl overflow-hidden">
         {["kuantitatif", "kualitatif", "teks"].map((type) => (
           <button
@@ -231,6 +232,7 @@ const ReferenceValueBuilder = ({ value, onChange }) => {
         ))}
       </div>
 
+      {/* TAB 1: KUANTITATIF */}
       {config.jenis === "kuantitatif" && (
         <div className="space-y-4 animate-fade-in bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
           <div className="flex items-center justify-between pb-3 border-b border-gray-50">
@@ -331,15 +333,61 @@ const ReferenceValueBuilder = ({ value, onChange }) => {
         </div>
       )}
 
-      {/* Bagian kualitatif & teks tetap sama seperti sebelumnya */}
+      {/* TAB 2: KUALITATIF */}
       {config.jenis === "kualitatif" && (
         <div className="space-y-4 animate-fade-in bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-          {/* ... kode kualitatif eksisting Anda ... */}
+          <div>
+            <label className="text-xs font-bold text-gray-700 mb-1.5 block">
+              Opsi Pilihan Dropdown{" "}
+              <span className="text-gray-400 font-normal">
+                (Pisahkan dengan koma)
+              </span>
+            </label>
+            <input
+              type="text"
+              placeholder="Contoh: Negatif, Positif, Invalid"
+              value={config.kualitatif.opsi}
+              onChange={(e) =>
+                handleChange("kualitatif", e.target.value, "opsi")
+              }
+              className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 transition-all"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1">
+              Hasil Normal{" "}
+              <AlertCircle
+                size={12}
+                className="text-amber-500"
+                title="Hasil selain ini akan ditandai merah otomatis"
+              />
+            </label>
+            <input
+              type="text"
+              placeholder="Contoh: Negatif"
+              value={config.kualitatif.normal}
+              onChange={(e) =>
+                handleChange("kualitatif", e.target.value, "normal")
+              }
+              className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 transition-all"
+            />
+          </div>
         </div>
       )}
+
+      {/* TAB 3: TEKS BEBAS */}
       {config.jenis === "teks" && (
         <div className="animate-fade-in bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-          {/* ... kode teks eksisting Anda ... */}
+          <label className="text-xs font-bold text-gray-700 mb-1.5 block">
+            Rujukan Manual / Formula Khusus
+          </label>
+          <input
+            type="text"
+            placeholder="Contoh: < 200 mg/dL, Tidak Terdeteksi"
+            value={config.teks_bebas}
+            onChange={(e) => handleChange("teks_bebas", e.target.value)}
+            className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100 transition-all"
+          />
         </div>
       )}
     </div>
